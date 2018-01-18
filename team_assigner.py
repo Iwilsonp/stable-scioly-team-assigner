@@ -6,15 +6,26 @@ Created on Wed Jan 17 15:03:13 2018
 @author: me
 """
 import numpy as np
-import os
 import math
 import networkx as nx
 import random
+import member_names
 
 event_names = ['Anatomy and Physiology','Astronomy','Chemistry Lab','Disease Detectives','Dynamic Planet','Ecology','Experimental Design','Fermi Questions','Forensics','Game On','Helicopters','Herpetology','Hovercraft','Materials Science','Microbe Mission','Mission Possible','Mousetrap Vehicle','Optics','Remote Sensing','Rocks and Minerals','Thermodynamics','Towers','Write It Do It']
 people_per_event = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-#built assuming we are team C-38
-event_conflicts = [['Disease Detectives','Fermi Questions'],['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],['Chemistry Lab','Ecology','Remote Sensing'],['Herpetology','Optics'],['Astronomy','Game On','Microbe Mission'],['Experimental Design']]
+#built assuming we are team C-38. All self-schedule events given their own block
+event_conflicts = [['Disease Detectives','Fermi Questions'],
+                   ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
+                   ['Chemistry Lab','Ecology','Remote Sensing'],
+                   ['Herpetology','Optics'],
+                   ['Astronomy','Game On','Microbe Mission'],
+                   ['Experimental Design','Forensics'],
+                   ['Materials Science','Thermodynamics', 'Write It Do It'],
+                   ['Helicopters'],
+                   ['Hovercraft'],
+                   ['Mission Possible'],
+                   ['Mousetrap Vehicle'],
+                   ['Towers']]
 people_names = ['person0','person1','person2','person3','person4','person5','person6','person7','person8','person9','person10','person11','person12','person13','person14','person15','person16','person17','person18','person19','person20','person21','person22','person23','person24','person25','person26','person27','person28','person29']
 
 team_size = 15
@@ -52,17 +63,26 @@ raw_prelim_test_scores = [[0,0,0,0,0,0,0,174,110,0,0,0,15.77319588,63,0,0,0,0,0,
 [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 [0,0,0,0,57,0,0,0,0,63,0,0,76.23712371,0,0,0,29.31,0,0,0,0,0,0]]
 
-def checkInputData(event_list, ppl_per_event, names, scores, max_scores):
-    if(len(event_list) != len(ppl_per_event)):
-        raise ValueError('length of the event list is: ' + str(len(event_list)) + ', length of the people per event list is: ' + str(len(ppl_per_event)))
-    num_ppl, num_events = scores.shape    
-    if(len(event_list) != num_events):
-        raise ValueError('number of events mismatch between list and max score array')
+def checkInputData(scores, max_scores):
+    num_ppl, num_events = scores.shape
+    if(len(people_per_event) != num_events):
+        raise ValueError('number of events mismatch between people per event list and max score array')
+    if(len(event_names) != num_events):
+        raise ValueError('number of events mismatch between event name list and max score list')
     if(len(max_scores) != num_events):
-        raise ValueError('number of events mismatch between list and score array')
-    if(len(names) != num_ppl):
-        raise ValueError('number of people mismatch between list and score array')
-        
+        raise ValueError('number of events mismatch between max score list and score array')
+    if(recursive_len(event_conflicts) != num_events):
+        raise ValueError('number of events mismatch between event conflict list and score array')
+    
+    if(len(people_names) != num_ppl):
+        raise ValueError('number of people mismatch between name list and score array')
+
+def recursive_len(item):  #total items in list of lists. From https://stackoverflow.com/questions/27761463/how-can-i-get-the-total-number-of-elements-in-my-arbitrarily-nested-list-of-list
+    if type(item) == list:
+        return sum(recursive_len(subitem) for subitem in item)
+    else:
+        return 1
+       
 def getColMax(np_array, column):
     return np.max(np_array[:,column])
 
@@ -103,7 +123,6 @@ def eventNameToNum(event_name):
 def genRandomTeam():
     return random.sample(range(0, num_people), team_size)
 
-def assign_team(team):
     
 
 #begin processing
@@ -112,13 +131,12 @@ max_person_num = num_people - 1
 num_events = len(event_names)
 raw_prelim_test_scores = np.asarray(raw_prelim_test_scores) #convert to numpy array
 
-checkInputData(event_names, people_per_event, people_names, raw_prelim_test_scores, max_prelim_test_scores)
+checkInputData(raw_prelim_test_scores, max_prelim_test_scores)
 
 processed_prelim_test_scores = normalizeData(raw_prelim_test_scores, max_prelim_test_scores)
 
 #generate combo array of all data
 scores = processed_prelim_test_scores
-
 
 
 
