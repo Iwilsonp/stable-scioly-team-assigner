@@ -8,11 +8,12 @@ Created on Wed Jan 17 15:03:13 2018
 import numpy as np
 import math
 import networkx as nx
+import networkx.algorithms.matching as matching
 import random
-import member_names
+import candidate_names
 
 event_names = ['Anatomy and Physiology','Astronomy','Chemistry Lab','Disease Detectives','Dynamic Planet','Ecology','Experimental Design','Fermi Questions','Forensics','Game On','Helicopters','Herpetology','Hovercraft','Materials Science','Microbe Mission','Mission Possible','Mousetrap Vehicle','Optics','Remote Sensing','Rocks and Minerals','Thermodynamics','Towers','Write It Do It']
-people_per_event = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+people_per_event = [2,2,2,2,2,2,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -26,7 +27,7 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Mission Possible'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
-people_names = ['person0','person1','person2','person3','person4','person5','person6','person7','person8','person9','person10','person11','person12','person13','person14','person15','person16','person17','person18','person19','person20','person21','person22','person23','person24','person25','person26','person27','person28','person29']
+people_names = candidate_names.names  #keep real names out of git repo
 
 team_size = 15
 
@@ -90,7 +91,7 @@ def getCol(np_array, column):
     return np_array[:, column]
     
 def normalizeData(scores, max_scores):
-    normalized_array = np.full(scores.shape, -1.0)
+    normalized_array = np.full(scores.shape, 0.0)
     
     for event in range(0, len(max_scores)):
         if max_scores[event] == 0:   #low score wins event
@@ -111,8 +112,15 @@ def normalizeData(scores, max_scores):
 def personNumToName(person_number):
     return people_names[person_number]
 
+def blockedPersonNumToName(person_number):
+    person_index = math.floor(event_conflicts/num_blocks)
+    return people_names[person_index]
+
 def personNameToNum(person_name):
     return people_names.index(person_name)
+
+def personNameToBlockedNum(person_name):
+    return people_names.index(person_name*num_blocks)
 
 def eventNumToName(event_number):
     return event_names(event_number)
@@ -120,15 +128,62 @@ def eventNumToName(event_number):
 def eventNameToNum(event_name):
     return event_names.index(event_name)
 
-def genRandomTeam():
-    return random.sample(range(0, num_people), team_size)
-
+def splitScoreArray(unblocked_scores):  #splits scores up into one row per person per block
+    num_ppl, num_events = unblocked_scores.shape
+    blocked_array = np.full((num_ppl*num_blocks, num_events), 0.0)
     
+    block_number = 0  #records which block we're on
+    for block in event_conflicts:
+        for event in block:
+            event_num = eventNameToNum(event) #what column number is this event
+            
+            person_number = 0  #records which person we're on
+            for score in getCol(unblocked_scores, event_num):
+                blocked_array[person_number*num_blocks + block_number, event_num] = score
+                person_number+= 1
+        block_number += 1
+    
+    return blocked_array
 
+def genRandomTeam():
+    team_list = random.sample(range(0, num_people), team_size)
+    return team_list.sort()
+   
+def numericalTeamToBlockedNames(numerical_team):
+    if !isinstance(numerical_team[0], int):
+        raise TypeError('Team must be ints')
+        
+    blocked_team_list = []
+    for member in numerical_team:
+        member_name = personNameToNum(member)
+        for block in range(0, num_blocks):
+            blocked_team_list.append(member_name + '_block_' + str(block))
+    return blocked_team_list
+    
+def assignTeam(unassigned_numerical_team_list, blocked_score_list):
+    B = nx.Graph() #create bipartate graph
+    size_of_hungarian_array = max(len(unassigned_numerical_team_list)*num_blocks, num_events)
+    
+    blocked_team_list = numericalTeamToBlockedNames(unassigned_numerical_team_list)
+    
+    #expand team list to required length
+    ieterator = 0
+    while(len(blocked_team_list) < size_of_hungarian_array):
+        blocked_team_list.append('NULL_PERSON_' + str(ieterator))
+        
+    
+    B.add_nodes_from([1,2,3,4], bipartite=0)
+    for person_num in range(0, size_of_hungarian_array):
+        for event_num in range(0, size_of_hungarian_array):
+            
+    
+    
+        
 #begin processing
 num_people = len(people_names)
 max_person_num = num_people - 1
 num_events = len(event_names)
+num_blocks = len(event_conflicts)
 raw_prelim_test_scores = np.asarray(raw_prelim_test_scores) #convert to numpy array
 
 checkInputData(raw_prelim_test_scores, max_prelim_test_scores)
@@ -137,6 +192,10 @@ processed_prelim_test_scores = normalizeData(raw_prelim_test_scores, max_prelim_
 
 #generate combo array of all data
 scores = processed_prelim_test_scores
+
+#split people into blocks for Hungarian algorithim processing
+scores_blocked = splitScoreArray(scores)
+
 
 
 
