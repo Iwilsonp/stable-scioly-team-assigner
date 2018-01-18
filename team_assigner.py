@@ -11,8 +11,9 @@ import networkx as nx
 import networkx.algorithms.matching as matching
 import random
 import candidate_names
+import csv
 
-event_names = ['Anatomy and Physiology','Astronomy','Chemistry Lab','Disease Detectives','Dynamic Planet','Ecology','Experimental Design','Fermi Questions','Forensics','Game On','Helicopters','Herpetology','Hovercraft','Materials Science','Microbe Mission','Mission Possible','Mousetrap Vehicle','Optics','Remote Sensing','Rocks and Minerals','Thermodynamics','Towers','Write It Do It']
+event_names = 'Anatomy and Physiology','Astronomy','Chemistry Lab','Disease Detectives','Dynamic Planet','Ecology','Experimental Design','Fermi Questions','Forensics','Game On','Helicopters','Herpetology','Hovercraft','Materials Science','Microbe Mission','Mission Possible','Mousetrap Vehicle','Optics','Remote Sensing','Rocks and Minerals','Thermodynamics','Towers','Write It Do It'
 people_per_event = [2,2,2,2,2,2,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
@@ -28,8 +29,6 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
 people_names = candidate_names.names  #keep real names out of git repo
-
-team_size = 15
 
 max_prelim_test_scores = [190,132,150,162,100,160,105,500,200,98,56.83,133,100,100,120,750.6,0,100,135,140,100,1291.71,175]
 #columns are events, rows are people
@@ -67,7 +66,7 @@ raw_prelim_test_scores = [[0,0,0,0,0,0,0,174,110,0,0,0,15.77319588,63,0,0,0,0,0,
 def checkInputData(scores, max_scores):
     num_ppl, num_events = scores.shape
     if(len(people_per_event) != num_events):
-        raise ValueError('number of events mismatch between people per event list and max score array')
+        raise ValueError('number of events mismatch between people per event list and score array')
     if(len(event_names) != num_events):
         raise ValueError('number of events mismatch between event name list and max score list')
     if(len(max_scores) != num_events):
@@ -108,7 +107,17 @@ def normalizeData(scores, max_scores):
         else:  #normal event
             normalized_array[:,event] = getCol(scores, event)/max_scores[event]
     return normalized_array
-       
+
+def strListToFloatList(str_list):
+    return_list = []
+    for string in str_list:
+        if isinstance(string, list) == True:
+            return_list.append(strListToFloatList(string))
+        else:
+            return_list.append(float(string))
+    return return_list
+        
+      
 def personNumToName(person_number):
     return people_names[person_number]
 
@@ -150,7 +159,7 @@ def genRandomTeam():
     return team_list.sort()
    
 def numericalTeamToBlockedNames(numerical_team):
-    if !isinstance(numerical_team[0], int):
+    if isinstance(numerical_team[0], int) == 0:
         raise TypeError('Team must be ints')
         
     blocked_team_list = []
@@ -159,7 +168,7 @@ def numericalTeamToBlockedNames(numerical_team):
         for block in range(0, num_blocks):
             blocked_team_list.append(member_name + '_block_' + str(block))
     return blocked_team_list
-    
+'''    
 def assignTeam(unassigned_numerical_team_list, blocked_score_list):
     B = nx.Graph() #create bipartate graph
     size_of_hungarian_array = max(len(unassigned_numerical_team_list)*num_blocks, num_events)
@@ -175,20 +184,38 @@ def assignTeam(unassigned_numerical_team_list, blocked_score_list):
     B.add_nodes_from([1,2,3,4], bipartite=0)
     for person_num in range(0, size_of_hungarian_array):
         for event_num in range(0, size_of_hungarian_array):
-            
+ '''           
     
     
         
+#read in data
+first_column = []
+prelim_data = []
+with open('prelim_results.csv') as prelim_test_file:
+    prelim_test_reader = csv.reader(prelim_test_file)
+    for row in prelim_test_reader:
+        first_column.append(row[0])
+        prelim_data.append(row[1:])
+
+people_names = first_column[4:]
+event_names = prelim_data[0]
+people_per_event = strListToFloatList(prelim_data[1])
+event_weight = strListToFloatList(prelim_data[3])
+
+max_prelim_test_scores = strListToFloatList(prelim_data[2])
+raw_prelim_test_scores = strListToFloatList(prelim_data[4:])
+team_size = 15
+
 #begin processing
 num_people = len(people_names)
 max_person_num = num_people - 1
 num_events = len(event_names)
 num_blocks = len(event_conflicts)
-raw_prelim_test_scores = np.asarray(raw_prelim_test_scores) #convert to numpy array
+np_raw_prelim_test_scores = np.asarray(raw_prelim_test_scores) #convert to numpy array
 
-checkInputData(raw_prelim_test_scores, max_prelim_test_scores)
+checkInputData(np_raw_prelim_test_scores, max_prelim_test_scores)
 
-processed_prelim_test_scores = normalizeData(raw_prelim_test_scores, max_prelim_test_scores)
+processed_prelim_test_scores = normalizeData(np_raw_prelim_test_scores, max_prelim_test_scores)
 
 #generate combo array of all data
 scores = processed_prelim_test_scores
