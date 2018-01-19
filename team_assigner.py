@@ -108,36 +108,79 @@ def normalizeData(scores, max_scores):
             normalized_array[:,event] = getCol(scores, event)/max_scores[event]
     return normalized_array
 
-def strListToFloatList(str_list):
+def strListToNumList(str_list, num_type = int):
     return_list = []
     for string in str_list:
         if isinstance(string, list) == True:
-            return_list.append(strListToFloatList(string))
+            return_list.append(strListToNumList(string, num_type = num_type))
         else:
-            return_list.append(float(string))
+            if num_type == float:
+                return_list.append(float(string))
+            elif num_type == int:
+                return_list.append(int(string))
     return return_list
         
       
 def personNumToName(person_number):
+    if person_number < 0:
+        return dummy_person_name
     return people_names[person_number]
-
-def blockedPersonNumToName(person_number):
-    person_index = math.floor(event_conflicts/num_blocks)
-    return people_names[person_index]
 
 def personNameToNum(person_name):
     return people_names.index(person_name)
 
-def personNameToBlockedNum(person_name):
-    return people_names.index(person_name*num_blocks)
+def personNameToBlockedNum(name, block):
+    if isinstance(name, int) == True:
+        return name*num_blocks + block
+    elif isinstance(name, str) == True:
+        return personNameToNum(name)*num_blocks + block
+    else:
+        raise TypeError('Name must be a string or an int')
+
+#turns a whole team list into a blocked list
+def teamToBlockedNames(numerical_team):        
+    blocked_team_list = []
+    for member in numerical_team:
+        for block in range(0, num_blocks):
+            blocked_team_list.append(personNameToBlockedNum(member, block))
+    return blocked_team_list
+
+def unpackBlockedPersonNum(number):
+    if number < 0:  #dummy person
+        return -1, 0
+    person_number = math.floor(number/num_blocks)
+    block_number = number%num_blocks
+    return person_number, block_number
 
 def eventNumToName(event_number):
+    if event_number < 0:
+        return dummy_event_name
     return event_names(event_number)
         
 def eventNameToNum(event_name):
     return event_names.index(event_name)
 
-def splitScoreArray(unblocked_scores):  #splits scores up into one row per person per block
+#takes event and a number identifying if this is the ith person on that event
+def eventToSinglePersonEvent(event, event_person_num):
+    max_people_per_event = max(people_per_event)
+    if isinstance(event, int) == True:
+        return event*max_people_per_event + event_person_num
+    elif isinstance(event, str) == True:
+        return eventNameToNum(event)*max_people_per_event + event_person_num
+    else:
+        raise TypeError('Event must be a string or an int')
+        
+#takes a list of events and turns them into single person events
+def eventListToSinglePersonEvents(list_of_events):
+    blocked_event_list = []
+    for event_iterator in range (0, len(list_of_events)):
+        event = list_of_events[event_iterator]
+        for person_slot in range(0, people_per_event[event_iterator]):
+            blocked_event_list.append(eventToSinglePersonEvent(event, person_slot))
+    return blocked_event_list
+
+#splits scores up into one row per person per block
+def splitScoreArray(unblocked_scores):
     num_ppl, num_events = unblocked_scores.shape
     blocked_array = np.full((num_ppl*num_blocks, num_events), 0.0)
     
@@ -154,20 +197,25 @@ def splitScoreArray(unblocked_scores):  #splits scores up into one row per perso
     
     return blocked_array
 
+#fill out a list with dummy items for Hungarian algo
+def makeListAsLongAs(short_list, long_list):
+    fake_thing_appended = -1
+    while len(short_list) < len(long_list):
+        short_list.append(fake_thing_appended)
+        fake_thing_appended -= 1
+    return short_list
+
 def genRandomTeam():
     team_list = random.sample(range(0, num_people), team_size)
     return team_list.sort()
-   
-def numericalTeamToBlockedNames(numerical_team):
-    if isinstance(numerical_team[0], int) == 0:
-        raise TypeError('Team must be ints')
+
+#takes in a list of unassigned team names and creates a graph of them
+def createGraphFromTeam(team_list):
+    teamGraph = nx.Graph()
+    blocked_team_list = teamToBlockedNames(team_list)
+    #fill up lists with dummies if needed
         
-    blocked_team_list = []
-    for member in numerical_team:
-        member_name = personNameToNum(member)
-        for block in range(0, num_blocks):
-            blocked_team_list.append(member_name + '_block_' + str(block))
-    return blocked_team_list
+    
 '''    
 def assignTeam(unassigned_numerical_team_list, blocked_score_list):
     B = nx.Graph() #create bipartate graph
@@ -197,13 +245,15 @@ with open('prelim_results.csv') as prelim_test_file:
         first_column.append(row[0])
         prelim_data.append(row[1:])
 
-people_names = first_column[4:]
-event_names = prelim_data[0]
-people_per_event = strListToFloatList(prelim_data[1])
-event_weight = strListToFloatList(prelim_data[3])
+people_names = tuple(first_column[4:])
+dummy_person_name = 'DUMMY_PERSON'
+event_names = tuple(prelim_data[0])
+dummy_event_name = 'DUMMY_EVENT'
+people_per_event = tuple(strListToNumList(prelim_data[1]))
+event_weight = tuple(strListToNumList(prelim_data[3], num_type = float))
 
-max_prelim_test_scores = strListToFloatList(prelim_data[2])
-raw_prelim_test_scores = strListToFloatList(prelim_data[4:])
+max_prelim_test_scores = tuple(strListToNumList(prelim_data[2], num_type = float))
+raw_prelim_test_scores = strListToNumList(prelim_data[4:], num_type = float)
 team_size = 15
 
 #begin processing
@@ -222,6 +272,7 @@ scores = processed_prelim_test_scores
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
+mono_person_event_list = tuple(eventListToSinglePersonEvents(event_names))
 
 
 
