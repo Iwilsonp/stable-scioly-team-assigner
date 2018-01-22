@@ -10,6 +10,7 @@ import math
 from scipy.optimize import linear_sum_assignment
 import random
 import csv
+import copy
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -250,11 +251,48 @@ def getTeamScore(unassigned_team_list):
 def findListOfPersonContributions(team_list):
     people_vs_score_list = []
     for person in team_list:
-        team_list_with_person_removed = team_list
+        team_list_with_person_removed = copy.deepcopy(team_list)
         team_list_with_person_removed.remove(person)
-        people_vs_score_list.append([person, getTeamScore(team_list)])
+        people_vs_score_list.append([person, getTeamScore(team_list_with_person_removed)])
+        del team_list_with_person_removed
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
     return people_vs_score_list
+
+def findBestAddition(team_list):
+    people_vs_score_list = []
+    possible_people = [x for x in range(0, num_people) if x not in team_list]
+    for person in possible_people:
+        team_list_with_person_added = copy.deepcopy(team_list)
+        team_list_with_person_added.append(person)
+        people_vs_score_list.append([person, getTeamScore(team_list_with_person_added)])
+        del team_list_with_person_added
+    people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
+    return people_vs_score_list[0][0]
+
+#returns the new team list and True (if it could replace) or False (if already optimized)
+def stepTeam(team_list):
+    print('')
+    person_vs_score_list = np.asarray(findListOfPersonContributions(team_list))
+    people_booting_order = getCol(person_vs_score_list, 0)
+    for booted_person in people_booting_order:
+        new_team = copy.deepcopy(team_list)
+        new_team.remove(booted_person)
+        added_person = findBestAddition(new_team)
+        if added_person != booted_person:
+            print('Booted person: ' + personNumToName(int(booted_person)))
+            print('Added person: ' + personNumToName(int(added_person)))
+            new_team.append(added_person)
+            new_team.sort()
+            return new_team, True
+        del new_team
+    #if can't optimize further
+    return team_list, False
+
+def optimizeTeam(team_list):
+    can_be_optimized = True
+    while can_be_optimized == True:
+        team_list, can_be_optimized = stepTeam(team_list)
+    return team_list
 
 def teamToHumanReadableTeam(clean_assigned_team):
     team_dict = {}
@@ -265,9 +303,18 @@ def teamToHumanReadableTeam(clean_assigned_team):
             team_dict[person_name] = events
     return team_dict
 
-def humanPrintTeam(human_readable_team):
+def humanPrintAssignedTeam(assigned_team):
+    if isinstance(assigned_team, list):
+        human_readable_team = teamToHumanReadableTeam(assigned_team)
     for person in human_readable_team:
         print(str(person) + ': ' + str(human_readable_team[person]))
+    if isinstance(assigned_team, list):
+        print(scoreTeam(assigned_team))
+    
+
+def humanPrintTeamList(team_list):
+    for person in team_list:
+        print(personNumToName(person))
         
 
 dummy_event_name = 'DUMMY_EVENT'
@@ -313,8 +360,9 @@ scores_blocked = splitScoreArray(scores)
 randTeam = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 25]
 
 assigned_team = assignTeam(randTeam)
-print(assigned_team)
-humanPrintTeam(teamToHumanReadableTeam(assigned_team))
-print(scoreTeam(assigned_team))
-print(findListOfPersonContributions(randTeam))
+humanPrintAssignedTeam(assigned_team)
+
+real_team = optimizeTeam(randTeam)
+assigned_real_team = assignTeam(randTeam)
+humanPrintAssignedTeam(assigned_real_team)
 
