@@ -7,8 +7,7 @@ Created on Wed Jan 17 15:03:13 2018
 """
 import numpy as np
 import math
-import networkx as nx
-from networkx.algorithms import bipartite
+from scipy.optimize import linear_sum_assignment
 import random
 import csv
 #built assuming we are team C-38. All self-schedule events given their own block
@@ -90,9 +89,6 @@ def personNumToName(person_number):
 def personNameToNum(person_name):
     return people_names.index(person_name)
 
-def getMinBlockedPersonNum():
-    return len(event_names) * max(people_per_event)
-
 def personNameToBlockedNum(name, block):
     if isinstance(name, int) == True:
         name_num = name
@@ -101,7 +97,7 @@ def personNameToBlockedNum(name, block):
     else:
         raise TypeError('Name must be a string or an int')
         
-    return name_num*num_blocks + block + getMinBlockedPersonNum()
+    return name_num*num_blocks + block
 
 #turns a whole team list into a blocked list
 def teamToBlockedNames(numerical_team):        
@@ -114,7 +110,6 @@ def teamToBlockedNames(numerical_team):
 def unpackBlockedPersonNum(number):
     if number < 0:  #dummy person
         return -1, 0
-    number = number - getMinBlockedPersonNum()
     person_number = math.floor(number/num_blocks)
     block_number = number%num_blocks
     return person_number, block_number
@@ -130,11 +125,15 @@ def eventNameToNum(event_name):
 #takes event and a number identifying if this is the ith person on that event
 def eventToSinglePersonEvent(event, event_person_num):
     if isinstance(event, int) == True:
-        return event*max_people_per_event + event_person_num
+        numerical_event = event
     elif isinstance(event, str) == True:
-        return eventNameToNum(event)*max_people_per_event + event_person_num
+        numerical_event = eventNameToNum(event)
     else:
         raise TypeError('Event must be a string or an int')
+    single_person_event = 0
+    for x in range(0, numerical_event):
+        single_person_event += people_per_event[x]
+    return single_person_event + event_person_num
         
 #takes a list of events and turns them into single person events
 def eventListToSinglePersonEvents(list_of_events):
@@ -146,12 +145,18 @@ def eventListToSinglePersonEvents(list_of_events):
     return blocked_event_list
 
 def singlePersonEventToEvent(single_person_event):
-    return math.floor(single_person_event/max_people_per_event)
+    event_num = 0
+    while single_person_event >= people_per_event[event_num]:
+        single_person_event -= people_per_event[event_num]
+        event_num += 1
+    return event_num
 
 #splits scores up into one row per person per block
 def splitScoreArray(unblocked_scores):
     num_ppl, num_events = unblocked_scores.shape
-    blocked_array = np.full((num_ppl*num_blocks, num_events*max_people_per_event), -1.0)
+    num_single_person_events = len(mono_person_event_list)
+    num_blocked_people = num_ppl*num_blocks
+    blocked_array = np.full((num_blocked_people,num_single_person_events), -1.0)
     
     block_number = 0  #records which block we're on
     for block in event_conflicts:
@@ -161,84 +166,71 @@ def splitScoreArray(unblocked_scores):
             for score in getCol(unblocked_scores, event_num):
                 mono_person_event_base_column = eventToSinglePersonEvent(event, 0)
                 blocked_array[person_number*num_blocks + block_number, 
-                              mono_person_event_base_column:mono_person_event_base_column+max_people_per_event] = score
+                              mono_person_event_base_column:mono_person_event_base_column+people_per_event[event_num]] = score
                 person_number+= 1
         block_number += 1
     
     return blocked_array
 
 def getTestScore(blocked_person, blocked_event):
-    if blocked_person < 0 or blocked_event < 0:  #fake person or event
-        return 0
-    else:
-        return scores_blocked[blocked_person - getMinBlockedPersonNum(), blocked_event]
+    return scores_blocked[blocked_person, blocked_event]
 
 #fill out a list with dummy items for Hungarian algo
-def makeListAsLongAs(short_list, long_list, starting_val = -1):
-    fake_thing_appended = starting_val
-    while len(short_list) < len(long_list):
-        short_list.append(fake_thing_appended)
-        fake_thing_appended -= 1
-    return short_list
 
 def genRandomTeam(size):
     team_list = random.sample(range(0, num_people), size)
     return team_list
 
+#makes a matrix square
+def makeSquare(numpy_array):
+    height, width = numpy_array.shape
+    if height < width:
+        added_array = np.zeros((width-height, width), dtype = numpy_array.dtype)
+        square_array = np.concatenate((numpy_array, added_array), axis = 0)
+    elif width < height:
+        added_array = np.zeros((height, height-width), dtype = numpy_array.dtype)
+        square_array = np.concatenate((numpy_array, added_array), axis = 1)
+    else:
+        square_array = numpy_array
+    return square_array
+
 #takes in a list of unassigned team names and creates a graph of them
-def createGraphFromTeam(team_list):
-    newTeamGraph = nx.Graph()
+def assignTeam(team_list):
     blocked_team_list = teamToBlockedNames(team_list)
     
-    local_mono_person_event_list = list(mono_person_event_list)  #local copy
-    #fill up lists with dummies if needed
-    blocked_team_list =  makeListAsLongAs(blocked_team_list, local_mono_person_event_list)
-    local_mono_person_event_list = makeListAsLongAs(local_mono_person_event_list, blocked_team_list)
+    scores_blocked_of_team = []
+    #make array with only the people in the team
+    for blocked_person_unit in blocked_team_list:
+        scores_blocked_of_team.append(scores_blocked[blocked_person_unit])
+    scores_blocked_of_team = np.asarray(scores_blocked_of_team)
+    
+    num_real_ppl, num_real_events = scores_blocked_of_team.shape
+    print(num_real_ppl)
+    print(num_real_events)
+    #expand to square array
+    hungarian_matrix = np.negative(makeSquare(scores_blocked_of_team))
+    assigned_blocked_ppl, blocked_event_assignments = linear_sum_assignment(hungarian_matrix)
+    assigned_team_list = cleanAssignedTeamList(assigned_blocked_ppl, blocked_event_assignments, blocked_team_list, num_real_events)
+    return assigned_team_list
 
-    newTeamGraph.add_nodes_from(blocked_team_list, bipartite=0)
-    newTeamGraph.add_nodes_from(local_mono_person_event_list, bipartite=1)
+def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num_real_events):
+    team_assigned = [[] for j in range(len(people_names))]
+    num_real_ppl = len(list_blocked_ppl)
     
-    for person in blocked_team_list:
-        for mono_event in local_mono_person_event_list:
-            test_score = getTestScore(person, mono_event)
-            newTeamGraph.add_edge(person, mono_event, weight=test_score)
-    return newTeamGraph, blocked_team_list
-    
-   
-def assignTeam(graph_of_team, blocked_team_list):
-    messy_team = bipartite.matching.maximum_matching(graph_of_team, top_nodes = blocked_team_list)
-    return filterAssignedTeamDict(messy_team)
+    for x in range(0, len(assigned_people)):
+        assigned_person = assigned_people[x]
+        blocked_event = blocked_events[x]
+        if assigned_person < num_real_ppl and blocked_event < num_real_events:
+            blocked_person = list_blocked_ppl[x]
+            person, block = unpackBlockedPersonNum(blocked_person)
+            event = singlePersonEventToEvent(blocked_event)
+            team_assigned[person].append(event)
+    return team_assigned
+        
+
 
 def predictPlace(test_score):
     return math.sqrt(test_score)
-
-#eliminates fake people and duplicate matchings. 
-#Returns dict with blocked people matched to blocked events.
-def filterAssignedTeamDict(messy_team_dict):
-    assigned_team_dict = {}
-    for node in messy_team_dict:
-        matched_node = messy_team_dict[node]
-        if node > 0 and matched_node > 0: #not a fake person or event
-            if node > getMinBlockedPersonNum(): #it's a person and not an event
-                assigned_team_dict[node] = matched_node
-    return assigned_team_dict
-
-def evalTeam(assigned_team):
-    event_test_scores = np.zeros(len(event_names))
-    for blocked_person in assigned_team:
-        test_score = scores_blocked
-    
-    
-def assignedTeamToHumanReadableTeam(assigned_team):
-    #initialize empty list of lists. Each entry corresponds to a person in the person list
-    humanTeam = [[] for i in range(num_people)]
-    for person in assigned_team:
-        person_num, block = unpackBlockedPersonNum(person)
-        single_person_event = assigned_team[person]#a real event, not null
-        event = singlePersonEventToEvent(single_person_event)
-        humanTeam[person_num].append(event)
-        
-    return humanTeam
         
     
 dummy_event_name = 'DUMMY_EVENT'
@@ -261,7 +253,7 @@ event_weight = tuple(strListToNumList(prelim_data[3], num_type = float))
 max_prelim_test_scores = tuple(strListToNumList(prelim_data[2], num_type = float))
 raw_prelim_test_scores = strListToNumList(prelim_data[4:], num_type = float)
 team_size = 15
-
+mono_person_event_list = tuple(eventListToSinglePersonEvents(event_names))
 #begin processing
 num_people = len(people_names)
 max_person_num = num_people - 1
@@ -280,15 +272,10 @@ scores = processed_prelim_test_scores
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
-mono_person_event_list = tuple(eventListToSinglePersonEvents(event_names))
 
 randTeam = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 25]
-print(randTeam)
-graph, people = createGraphFromTeam(randTeam)
-team = assignTeam(graph, people)
-print(team)
-print(len(team))
-human_readable_team = assignedTeamToHumanReadableTeam(team)
-print(human_readable_team)
-print(recursive_len(human_readable_team))
 
+assigned_team = assignTeam(randTeam)
+print(assigned_team)
+print(len(assigned_team))
+print(recursive_len(assigned_team))
