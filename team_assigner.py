@@ -12,7 +12,7 @@ import random
 import csv
 import copy
 
-list_of_files = ['prelim_results.csv', 'prelim_results_1.csv']
+list_of_files = ['prelim_results.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -380,8 +380,6 @@ for file in list_of_files:
     invite_weight_list.append(data_weight)
 
 #begin checks
-if round(sum(invite_weight_list), 3) != 1:
-    raise ValueError('sum of weights must equal 1')
 if checkAllAreEqual(people_names_list) == False:
     raise ValueError('people names must be consistent')
 if checkAllAreEqual(event_names_list) == False:
@@ -407,7 +405,10 @@ max_people_per_event = max(people_per_event)
 scores = np.zeros(np.shape(processed_scores_list[0]))
 for x in range(0, len(processed_scores_list)):
     scores = scores + processed_scores_list[x]*invite_weight_list[x]
-print(scores)
+
+for x in range(0, len(event_weight)):
+    weight = event_weight[x]
+    scores[:,x] = scores[:,x]*weight
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
