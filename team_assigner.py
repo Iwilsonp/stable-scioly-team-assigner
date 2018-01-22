@@ -117,10 +117,16 @@ def unpackBlockedPersonNum(number):
 def eventNumToName(event_number):
     if event_number < 0:
         return dummy_event_name
-    return event_names(event_number)
+    return event_names[event_number]
         
 def eventNameToNum(event_name):
     return event_names.index(event_name)
+
+def eventNumListToNameList(event_number_list):
+    name_list = []
+    for event_number in event_number_list:
+        name_list.append(eventNumToName(event_number))
+    return name_list
 
 #takes event and a number identifying if this is the ith person on that event
 def eventToSinglePersonEvent(event, event_person_num):
@@ -175,7 +181,20 @@ def splitScoreArray(unblocked_scores):
 def getTestScore(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
 
-#fill out a list with dummy items for Hungarian algo
+def predictPlace(test_score):
+    return 60*(1-test_score)   
+        
+def scoreTeam(assigned_team):
+    sum_test_scores_per_event = np.zeros(num_events)
+    for person in range(0, len(assigned_team)):
+        persons_events = assigned_team[person]
+        for event in persons_events:
+            sum_test_scores_per_event[event] += scores[person, event]
+    placing = 0
+    for x in range(0, len(sum_test_scores_per_event)):
+        score = sum_test_scores_per_event[x]/people_per_event[x]
+        placing += predictPlace(score)
+    return placing
 
 def genRandomTeam(size):
     team_list = random.sample(range(0, num_people), size)
@@ -205,8 +224,6 @@ def assignTeam(team_list):
     scores_blocked_of_team = np.asarray(scores_blocked_of_team)
     
     num_real_ppl, num_real_events = scores_blocked_of_team.shape
-    print(num_real_ppl)
-    print(num_real_events)
     #expand to square array
     hungarian_matrix = np.negative(makeSquare(scores_blocked_of_team))
     assigned_blocked_ppl, blocked_event_assignments = linear_sum_assignment(hungarian_matrix)
@@ -226,13 +243,33 @@ def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num
             event = singlePersonEventToEvent(blocked_event)
             team_assigned[person].append(event)
     return team_assigned
+
+def getTeamScore(unassigned_team_list):
+    return scoreTeam(assignTeam(unassigned_team_list))
+#takes in an unassigned list and returns it sorted by least contribution to greatest
+def findListOfPersonContributions(team_list):
+    people_vs_score_list = []
+    for person in team_list:
+        team_list_with_person_removed = team_list
+        team_list_with_person_removed.remove(person)
+        people_vs_score_list.append([person, getTeamScore(team_list)])
+    people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
+    return people_vs_score_list
+
+def teamToHumanReadableTeam(clean_assigned_team):
+    team_dict = {}
+    for person in range(0, len(clean_assigned_team)):
+        person_name = personNumToName(person)
+        events = eventNumListToNameList(clean_assigned_team[person])
+        if len(events) > 0:  #has some events assigned
+            team_dict[person_name] = events
+    return team_dict
+
+def humanPrintTeam(human_readable_team):
+    for person in human_readable_team:
+        print(str(person) + ': ' + str(human_readable_team[person]))
         
 
-
-def predictPlace(test_score):
-    return math.sqrt(test_score)
-        
-    
 dummy_event_name = 'DUMMY_EVENT'
 dummy_person_name = 'DUMMY_PERSON'    
         
@@ -277,5 +314,7 @@ randTeam = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 25]
 
 assigned_team = assignTeam(randTeam)
 print(assigned_team)
-print(len(assigned_team))
-print(recursive_len(assigned_team))
+humanPrintTeam(teamToHumanReadableTeam(assigned_team))
+print(scoreTeam(assigned_team))
+print(findListOfPersonContributions(randTeam))
+
