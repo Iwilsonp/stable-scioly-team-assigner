@@ -11,6 +11,8 @@ from scipy.optimize import linear_sum_assignment
 import random
 import csv
 import copy
+
+list_of_files = ['prelim_results.csv', 'prelim_results_1.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -24,7 +26,7 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Mission Possible'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
-def checkInputData(scores, max_scores):
+def checkInputData(scores, max_scores, people_per_event, event_names, people_names):
     num_ppl, num_events = scores.shape
     if(len(people_per_event) != num_events):
         raise ValueError('number of events mismatch between people per event list and score array')
@@ -38,6 +40,28 @@ def checkInputData(scores, max_scores):
     if(len(people_names) != num_ppl):
         raise ValueError('number of people mismatch between name list and score array')
 
+def checkListEquality(list1, list2):
+    if recursive_len(list1) != recursive_len(list2):
+        return False
+    if type(list1) == type(list2) and type(list1) == list:
+        x = 0
+        for x in range(0, len(list1)):
+            if checkListEquality(list1) != checkListEquality(list2):
+                return False
+        return True  #if passedthe test
+    else:
+        if list1 == list2:
+            return True
+        else:
+            return False
+        
+def checkAllAreEqual(list_of_data):
+    if len(list_of_data) == 1:
+        return True #only one data point in the list
+    for x in range(0, len(list_of_data) - 1):
+        if checkListEquality(list_of_data[x], list_of_data[x+1]) == False:
+            return False
+    return True
 def recursive_len(item):  #total items in list of lists. From https://stackoverflow.com/questions/27761463/how-can-i-get-the-total-number-of-elements-in-my-arbitrarily-nested-list-of-list
     if type(item) == list:
         return sum(recursive_len(subitem) for subitem in item)
@@ -161,7 +185,7 @@ def singlePersonEventToEvent(single_person_event):
 #splits scores up into one row per person per block
 def splitScoreArray(unblocked_scores):
     num_ppl, num_events = unblocked_scores.shape
-    num_single_person_events = len(mono_person_event_list)
+    num_single_person_events = sum(people_per_event)
     num_blocked_people = num_ppl*num_blocks
     blocked_array = np.full((num_blocked_people,num_single_person_events), -1.0)
     
@@ -316,28 +340,62 @@ def humanPrintTeamList(team_list):
     for person in team_list:
         print(personNumToName(person))
         
-
-dummy_event_name = 'DUMMY_EVENT'
-dummy_person_name = 'DUMMY_PERSON'    
-        
-#read in data
-first_column = []
-prelim_data = []
-with open('prelim_results.csv') as prelim_test_file:
-    prelim_test_reader = csv.reader(prelim_test_file)
-    for row in prelim_test_reader:
-        first_column.append(row[0])
-        prelim_data.append(row[1:])
-
-people_names = tuple(first_column[4:])
-event_names = tuple(prelim_data[0])
-people_per_event = tuple(strListToNumList(prelim_data[1]))
-event_weight = tuple(strListToNumList(prelim_data[3], num_type = float))
-
-max_prelim_test_scores = tuple(strListToNumList(prelim_data[2], num_type = float))
-raw_prelim_test_scores = strListToNumList(prelim_data[4:], num_type = float)
+def loadFile(file_name):       
+    #read in data
+    first_column = []
+    prelim_data = []
+    with open(file_name) as data_file:
+        data_reader = csv.reader(data_file)
+        for row in data_reader:
+            first_column.append(row[0])
+            prelim_data.append(row[1:])
+    
+    people_names = tuple(first_column[4:])
+    event_names = tuple(prelim_data[0])
+    people_per_event = tuple(strListToNumList(prelim_data[1]))
+    event_weight = tuple(strListToNumList(prelim_data[3], num_type = float))
+    data_weight = float(first_column[0])
+    
+    max_data_scores = tuple(strListToNumList(prelim_data[2], num_type = float))
+    raw_data_scores = strListToNumList(prelim_data[4:], num_type = float)
+    np_raw_data_scores = np.asarray(raw_data_scores) #convert to numpy array
+    checkInputData(np_raw_data_scores, max_data_scores, people_per_event, event_names, people_names)
+    processed_data_scores = normalizeData(np_raw_data_scores, max_data_scores)
+    return processed_data_scores, people_names, event_names, people_per_event, event_weight, data_weight
 team_size = 15
-mono_person_event_list = tuple(eventListToSinglePersonEvents(event_names))
+
+processed_scores_list = []
+people_names_list = []
+event_names_list = []
+people_per_event_list = []
+event_weight_list = []
+invite_weight_list = []
+for file in list_of_files:
+    processed_data_scores, people_names, event_names, people_per_event, event_weight, data_weight = loadFile(file)
+    processed_scores_list.append(processed_data_scores)
+    people_names_list.append(people_names)
+    event_names_list.append(event_names)
+    people_per_event_list.append(people_per_event)
+    event_weight_list.append(event_weight)
+    invite_weight_list.append(data_weight)
+
+#begin checks
+if round(sum(invite_weight_list), 3) != 1:
+    raise ValueError('sum of weights must equal 1')
+if checkAllAreEqual(people_names_list) == False:
+    raise ValueError('people names must be consistent')
+if checkAllAreEqual(event_names_list) == False:
+    raise ValueError('event names must be consistent')
+if checkAllAreEqual(people_per_event_list) == False:
+    raise ValueError('people per event must be consistent')
+if checkAllAreEqual(event_weight_list) == False:
+    raise ValueError('event weights must be consistent')
+    
+people_names = tuple(people_names_list[0])
+event_names = tuple(event_names_list[0])
+people_per_event = tuple(people_per_event_list[0])
+event_weight = tuple(event_weight_list[0])
+
 #begin processing
 num_people = len(people_names)
 max_person_num = num_people - 1
@@ -345,24 +403,31 @@ num_events = len(event_names)
 num_blocks = len(event_conflicts)
 max_people_per_event = max(people_per_event)
 
-np_raw_prelim_test_scores = np.asarray(raw_prelim_test_scores) #convert to numpy array
-
-checkInputData(np_raw_prelim_test_scores, max_prelim_test_scores)
-
-processed_prelim_test_scores = normalizeData(np_raw_prelim_test_scores, max_prelim_test_scores)
-
 #generate combo array of all data
-scores = processed_prelim_test_scores
+scores = np.zeros(np.shape(processed_scores_list[0]))
+for x in range(0, len(processed_scores_list)):
+    scores = scores + processed_scores_list[x]*invite_weight_list[x]
+print(scores)
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
 
-randTeam = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 25]
+list_of_best_teams = []
+num_tried = 0
+try:
+    while True:
+        randTeam = genRandomTeam(team_size)
 
-assigned_team = assignTeam(randTeam)
-humanPrintAssignedTeam(assigned_team)
-
-real_team = optimizeTeam(randTeam)
-assigned_real_team = assignTeam(randTeam)
-humanPrintAssignedTeam(assigned_real_team)
+        real_team = optimizeTeam(randTeam)
+        assigned_real_team = assignTeam(real_team)
+        score = scoreTeam(assigned_real_team)
+        humanPrintAssignedTeam(assigned_real_team)
+        list_of_best_teams.append([score, assigned_real_team])
+        num_tried += 1
+        print(num_tried)
+except KeyboardInterrupt:
+    sorted_list = sorted(list_of_best_teams)
+    for team in sorted_list:
+        team = team[1]
+        humanPrintAssignedTeam(team)
 
