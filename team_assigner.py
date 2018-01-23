@@ -140,8 +140,6 @@ def unpackBlockedPersonNum(number):
     return person_number, block_number
 
 def eventNumToName(event_number):
-    if event_number < 0:
-        return dummy_event_name
     return event_names[event_number]
         
 def eventNameToNum(event_name):
@@ -431,4 +429,3 @@ except KeyboardInterrupt:
     for team in sorted_list:
         team = team[1]
         humanPrintAssignedTeam(team)
-
