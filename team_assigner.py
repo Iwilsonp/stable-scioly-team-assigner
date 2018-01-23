@@ -11,6 +11,7 @@ from scipy.optimize import linear_sum_assignment
 import random
 import csv
 import copy
+import time
 
 list_of_files = ['prelim_results.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
@@ -285,7 +286,7 @@ def findListOfPersonContributions(team_list):
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
     return people_vs_score_list
 
-def findBestAddition(team_list):
+def findBestAdditionList(team_list):
     people_vs_score_list = []
     possible_people = [x for x in range(0, num_people) if x not in team_list]
     for person in possible_people:
@@ -294,7 +295,10 @@ def findBestAddition(team_list):
         people_vs_score_list.append([person, getTeamScore(team_list_with_person_added)])
         del team_list_with_person_added
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
-    return people_vs_score_list[0][0]
+    return people_vs_score_list[0]
+
+def findBestAddition(team_list):
+    return findBestAdditionList(team_list)[0]
 
 #returns the new team list and True (if it could replace) or False (if already optimized)
 def stepTeam(team_list):
@@ -339,7 +343,7 @@ def humanPrintAssignedTeam(assigned_team):
         except KeyError:
             pass
     if isinstance(assigned_team, list):
-        print(scoreTeam(assigned_team))
+        print('Score: ' + str(scoreTeam(assigned_team)))
     
 
 def humanPrintTeamList(team_list):
@@ -419,21 +423,25 @@ for x in range(0, len(event_weight)):
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
 
-list_of_best_teams = []
-num_tried = 0
-try:
-    while True:
-        randTeam = genRandomTeam(team_size)
+#generate team by just adding whoever increases the score most
+start_time = time.time()
+team = []
+for x in range(0, team_size):
+    best_addition = findBestAddition(team)
+    print('Adding person: ' + personNumToName(best_addition))
+    team.append(best_addition)
 
-        real_team = optimizeTeam(randTeam)
-        assigned_real_team = assignTeam(real_team)
-        score = scoreTeam(assigned_real_team)
-        humanPrintAssignedTeam(assigned_real_team)
-        list_of_best_teams.append([score, assigned_real_team])
-        num_tried += 1
-        print(num_tried)
-except KeyboardInterrupt:
-    sorted_list = sorted(list_of_best_teams)
-    for team in sorted_list:
-        team = team[1]
-        humanPrintAssignedTeam(team)
+team = optimizeTeam(team)
+assigned_team = assignTeam(team)
+humanPrintAssignedTeam(assigned_team)
+print('Assignment took ' + str(time.time() - start_time) + 's')
+
+while True:
+    start_time = time.time()
+    randTeam = genRandomTeam(team_size)
+
+    real_team = optimizeTeam(randTeam)
+    assigned_real_team = assignTeam(real_team)
+    score = scoreTeam(assigned_real_team)
+    humanPrintAssignedTeam(assigned_real_team)
+    print('Assignment took ' + str(time.time() - start_time) + 's')
