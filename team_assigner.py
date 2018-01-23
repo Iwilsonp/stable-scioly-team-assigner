@@ -12,7 +12,7 @@ import random
 import csv
 import copy
 
-list_of_files = ['prelim_results.csv', 'mit_scores.csv']
+list_of_files = ['prelim_results.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
