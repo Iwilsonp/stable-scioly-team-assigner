@@ -205,19 +205,24 @@ def getTestScore(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
 
 def predictPlace(test_score):
-    return 60*(1-test_score)   
+    return 60*(1-math.sqrt(test_score))   
+
+def multiEventPenalty(events_one_person):
+    return 0
         
 def scoreTeam(assigned_team):
     sum_test_scores_per_event = np.zeros(num_events)
+    events_per_person_penalty = 0
     for person in range(0, len(assigned_team)):
         persons_events = assigned_team[person]
+        events_per_person_penalty += multiEventPenalty(len(persons_events))
         for event in persons_events:
             sum_test_scores_per_event[event] += scores[person, event]
     placing = 0
     for x in range(0, len(sum_test_scores_per_event)):
         score = sum_test_scores_per_event[x]/people_per_event[x]
         placing += predictPlace(score)
-    return placing
+    return placing + events_per_person_penalty
 
 def genRandomTeam(size):
     team_list = random.sample(range(0, num_people), size)
