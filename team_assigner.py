@@ -79,7 +79,10 @@ def getColMax(np_array, column):
     return np.max(np_array[:,column])
 
 def getCol(np_array, column):
-    return np_array[:, column]
+    try:
+        return np_array[:, column]
+    except TypeError:
+        return[row[column] for row in np_array]
     
 def normalizeData(scores, max_scores):
     normalized_array = np.full(scores.shape, 0.0)
@@ -114,8 +117,6 @@ def strListToNumList(str_list, num_type = int):
         
       
 def personNumToName(person_number):
-    if person_number < 0:
-        return dummy_person_name
     return people_names[person_number]
 
 def personNameToNum(person_name):
@@ -295,7 +296,7 @@ def findBestAdditionList(team_list):
         people_vs_score_list.append([person, getTeamScore(team_list_with_person_added)])
         del team_list_with_person_added
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
-    return people_vs_score_list[0]
+    return getCol(people_vs_score_list, 0)
 
 def findBestAddition(team_list):
     return findBestAdditionList(team_list)[0]
@@ -424,24 +425,29 @@ for x in range(0, len(event_weight)):
 scores_blocked = splitScoreArray(scores)
 
 #generate team by just adding whoever increases the score most
-start_time = time.time()
-team = []
-for x in range(0, team_size):
-    best_addition = findBestAddition(team)
-    print('Adding person: ' + personNumToName(best_addition))
-    team.append(best_addition)
-
-team = optimizeTeam(team)
-assigned_team = assignTeam(team)
-humanPrintAssignedTeam(assigned_team)
-print('Assignment took ' + str(time.time() - start_time) + 's')
-
-while True:
+try:
+    start_time = time.time()
+    team = []
+    list_of_candidates = findBestAdditionList(team)
+    team = list_of_candidates[0:team_size]
+    team = optimizeTeam(team)
+    
+    assigned_team = assignTeam(team)
+    humanPrintAssignedTeam(assigned_team)
+    score = scoreTeam(assigned_team)
+    print('Assignment took ' + str(time.time() - start_time) + 's')
+    
+    print('Verifying solution stability')
     start_time = time.time()
     randTeam = genRandomTeam(team_size)
 
-    real_team = optimizeTeam(randTeam)
-    assigned_real_team = assignTeam(real_team)
-    score = scoreTeam(assigned_real_team)
-    humanPrintAssignedTeam(assigned_real_team)
-    print('Assignment took ' + str(time.time() - start_time) + 's')
+    team_2 = optimizeTeam(randTeam)
+    assigned_team_2 = assignTeam(team_2)
+    if scoreTeam(assigned_team_2) == score:  #same team as before
+        print('Stable')
+        print('Verifying stability took ' + str(time.time() - start_time) + 's')
+    else:
+        print('WARNING: Solution unstable! Report immediantly. Include code, score files, and program output.')
+        humanPrintAssignedTeam(assigned_team_2)
+except KeyboardInterrupt:
+    pass
