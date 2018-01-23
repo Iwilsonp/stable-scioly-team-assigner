@@ -11,8 +11,15 @@ from scipy.optimize import linear_sum_assignment
 import random
 import csv
 import copy
+import time
+import sys
 
-list_of_files = ['prelim_results.csv']
+do_compression = int(sys.argv[1])
+if do_compression != 0 and do_compression != 1:
+    raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
+
+list_of_files = sys.argv[2:]
+
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -107,9 +114,11 @@ def checkForConflict():
     return False
 #combines blocks where there is no chance of conflict (e.g. Heli and Hover)
 def compressSchedule():
+    print('Number of blocks before compression: ' + str(len(event_conflicts)))
     possible_compression = True       
     while possible_compression == True:
         possible_compression = checkForConflict()
+    print('Number of blocks after compression: ' + str(len(event_conflicts)))
         
             
     
@@ -124,7 +133,10 @@ def getColMax(np_array, column):
     return np.max(np_array[:,column])
 
 def getCol(np_array, column):
-    return np_array[:, column]
+    try:
+        return np_array[:, column]
+    except TypeError:
+        return[row[column] for row in np_array]
     
 def normalizeData(scores, max_scores):
     normalized_array = np.full(scores.shape, 0.0)
@@ -159,8 +171,6 @@ def strListToNumList(str_list, num_type = int):
         
       
 def personNumToName(person_number):
-    if person_number < 0:
-        return dummy_person_name
     return people_names[person_number]
 
 def personNameToNum(person_name):
@@ -331,7 +341,7 @@ def findListOfPersonContributions(team_list):
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
     return people_vs_score_list
 
-def findBestAddition(team_list):
+def findBestAdditionList(team_list):
     people_vs_score_list = []
     possible_people = [x for x in range(0, num_people) if x not in team_list]
     for person in possible_people:
@@ -340,7 +350,10 @@ def findBestAddition(team_list):
         people_vs_score_list.append([person, getTeamScore(team_list_with_person_added)])
         del team_list_with_person_added
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
-    return people_vs_score_list[0][0]
+    return getCol(people_vs_score_list, 0)
+
+def findBestAddition(team_list):
+    return findBestAdditionList(team_list)[0]
 
 #returns the new team list and True (if it could replace) or False (if already optimized)
 def stepTeam(team_list):
@@ -385,7 +398,7 @@ def humanPrintAssignedTeam(assigned_team):
         except KeyError:
             pass
     if isinstance(assigned_team, list):
-        print(scoreTeam(assigned_team))
+        print('Score: ' + str(scoreTeam(assigned_team)))
     
 
 def humanPrintTeamList(team_list):
@@ -464,20 +477,37 @@ for x in range(0, len(event_weight)):
     scores[:,x] = scores[:,x]*weight
     
 #optimize code by compressing the event schedule
-compressSchedule()
+if do_compression == 1:
+    compressSchedule()
 
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
 
-num_tried = 0
-while True:
+#generate team by just adding whoever increases the score most
+try:
+    start_time = time.time()
+    team = []
+    list_of_candidates = findBestAdditionList(team)
+    team = list_of_candidates[0:team_size]
+    team = optimizeTeam(team)
+    
+    assigned_team = assignTeam(team)
+    humanPrintAssignedTeam(assigned_team)
+    score = scoreTeam(assigned_team)
+    print('Assignment took ' + str(time.time() - start_time) + 's')
+    
+    print('Verifying solution stability')
+    start_time = time.time()
     randTeam = genRandomTeam(team_size)
 
-    real_team = optimizeTeam(randTeam)
-    assigned_real_team = assignTeam(real_team)
-    score = scoreTeam(assigned_real_team)
-    humanPrintAssignedTeam(assigned_real_team)
-    list_of_best_teams.append([score, assigned_real_team])
-    num_tried += 1
-    print(num_tried)
+    team_2 = optimizeTeam(randTeam)
+    assigned_team_2 = assignTeam(team_2)
+    if scoreTeam(assigned_team_2) == score:  #same team as before
+        print('Stable')
+        print('Verifying stability took ' + str(time.time() - start_time) + 's')
+    else:
+        print('WARNING: Solution unstable! Report immediantly. Include code, score files, and program output.')
+        humanPrintAssignedTeam(assigned_team_2)
+except KeyboardInterrupt:
+    pass
