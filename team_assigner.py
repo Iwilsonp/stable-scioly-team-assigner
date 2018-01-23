@@ -12,7 +12,7 @@ import random
 import csv
 import copy
 
-list_of_files = ['prelim_results.csv']
+list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -419,21 +419,14 @@ for x in range(0, len(event_weight)):
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
 
-list_of_best_teams = []
 num_tried = 0
-try:
-    while True:
-        randTeam = genRandomTeam(team_size)
+while True:
+    randTeam = genRandomTeam(team_size)
 
-        real_team = optimizeTeam(randTeam)
-        assigned_real_team = assignTeam(real_team)
-        score = scoreTeam(assigned_real_team)
-        humanPrintAssignedTeam(assigned_real_team)
-        list_of_best_teams.append([score, assigned_real_team])
-        num_tried += 1
-        print(num_tried)
-except KeyboardInterrupt:
-    sorted_list = sorted(list_of_best_teams)
-    for team in sorted_list:
-        team = team[1]
-        humanPrintAssignedTeam(team)
+    real_team = optimizeTeam(randTeam)
+    assigned_real_team = assignTeam(real_team)
+    score = scoreTeam(assigned_real_team)
+    humanPrintAssignedTeam(assigned_real_team)
+    list_of_best_teams.append([score, assigned_real_team])
+    num_tried += 1
+    print(num_tried)
