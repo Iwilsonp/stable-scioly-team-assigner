@@ -21,10 +21,12 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Astronomy','Game On','Microbe Mission'],
                    ['Experimental Design','Forensics'],
                    ['Materials Science','Thermodynamics', 'Write It Do It'],
-                   ['Helicopters', 'Hovercraft'],
+                   ['Helicopters'],
+                   ['Hovercraft'],
                    ['Mission Possible'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
+team_size = 15
 
 def predictPlace(test_score):
     return 60*(1-math.sqrt(test_score))   
@@ -60,7 +62,7 @@ def checkListEquality(list1, list2):
             return True
         else:
             return False
-        
+       
 def checkAllAreEqual(list_of_data):
     if len(list_of_data) == 1:
         return True #only one data point in the list
@@ -68,6 +70,50 @@ def checkAllAreEqual(list_of_data):
         if checkListEquality(list_of_data[x], list_of_data[x+1]) == False:
             return False
     return True
+
+def checkEventsForConflict(event_1, event_2):
+    if isinstance(event_1, str):
+        event_1 = eventNameToNum(event_1)
+    if isinstance(event_2, str):
+        event_2 = eventNameToNum(event_2)
+    event_1_scores = getCol(scores, event_1)
+    event_2_scores = getCol(scores, event_2)
+    
+    if len(event_1_scores) != len(event_2_scores):
+        raise ValueError('mismatched column lengths in score matrix when compressing schedule')
+    
+    for x in range(0, len(event_1_scores)):
+        if event_1_scores[x] != 0 and event_2_scores[x] != 0:
+            #somebody can do both events
+            return True
+    return False  #if nobody does both events
+
+def checkBlocksForConflict(block_1, block_2):
+    for event_1 in block_1:
+        for event_2 in block_2:
+            if checkEventsForConflict(event_1, event_2) == True:
+                #somebody has events in both blocks
+                return True
+    return False
+
+# tries to combine blocks
+def checkForConflict():
+    for x in range(0, len(event_conflicts)):
+        for y in range(x, len(event_conflicts)):
+            if checkBlocksForConflict(event_conflicts[x], event_conflicts[y]) == False:
+                event_conflicts[x] = event_conflicts[x] + event_conflicts[y]
+                del event_conflicts[y]
+                return True
+    return False
+#combines blocks where there is no chance of conflict (e.g. Heli and Hover)
+def compressSchedule():
+    possible_compression = True       
+    while possible_compression == True:
+        possible_compression = checkForConflict()
+        
+            
+    
+
 def recursive_len(item):  #total items in list of lists. From https://stackoverflow.com/questions/27761463/how-can-i-get-the-total-number-of-elements-in-my-arbitrarily-nested-list-of-list
     if type(item) == list:
         return sum(recursive_len(subitem) for subitem in item)
@@ -368,8 +414,8 @@ def loadFile(file_name):
     checkInputData(np_raw_data_scores, max_data_scores, people_per_event, event_names, people_names)
     processed_data_scores = normalizeData(np_raw_data_scores, max_data_scores)
     return processed_data_scores, people_names, event_names, people_per_event, event_weight, data_weight
-team_size = 15
 
+#import data from file
 processed_scores_list = []
 people_names_list = []
 event_names_list = []
@@ -385,7 +431,7 @@ for file in list_of_files:
     event_weight_list.append(event_weight)
     invite_weight_list.append(data_weight)
 
-#begin checks
+#begin checks to see if csv files are consistent
 if checkAllAreEqual(people_names_list) == False:
     raise ValueError('people names must be consistent')
 if checkAllAreEqual(event_names_list) == False:
@@ -394,7 +440,8 @@ if checkAllAreEqual(people_per_event_list) == False:
     raise ValueError('people per event must be consistent')
 if checkAllAreEqual(event_weight_list) == False:
     raise ValueError('event weights must be consistent')
-    
+
+#nobody should be modifying these    
 people_names = tuple(people_names_list[0])
 event_names = tuple(event_names_list[0])
 people_per_event = tuple(people_per_event_list[0])
@@ -415,6 +462,10 @@ for x in range(0, len(processed_scores_list)):
 for x in range(0, len(event_weight)):
     weight = event_weight[x]
     scores[:,x] = scores[:,x]*weight
+    
+#optimize code by compressing the event schedule
+compressSchedule()
+
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
