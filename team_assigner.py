@@ -21,11 +21,17 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Astronomy','Game On','Microbe Mission'],
                    ['Experimental Design','Forensics'],
                    ['Materials Science','Thermodynamics', 'Write It Do It'],
-                   ['Helicopters'],
-                   ['Hovercraft'],
+                   ['Helicopters', 'Hovercraft'],
                    ['Mission Possible'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
+
+def predictPlace(test_score):
+    return 60*(1-math.sqrt(test_score))   
+
+def multiEventPenalty(events_one_person):
+    return 0
+
 def checkInputData(scores, max_scores, people_per_event, event_names, people_names):
     num_ppl, num_events = scores.shape
     if(len(people_per_event) != num_events):
@@ -79,7 +85,7 @@ def normalizeData(scores, max_scores):
     
     for event in range(0, len(max_scores)):
         if max_scores[event] == 0:   #low score wins event
-            participation_ability = 0.3 #if worst person on event
+            participation_ability = 0.1 #if worst person on event
             max_score = getColMax(scores, event) * (1 + participation_ability)
             #normalize with the highest score getting 0
             num_people = len(getCol(scores, event))
@@ -203,12 +209,6 @@ def splitScoreArray(unblocked_scores):
 
 def getTestScore(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
-
-def predictPlace(test_score):
-    return 60*(1-math.sqrt(test_score))   
-
-def multiEventPenalty(events_one_person):
-    return 0
         
 def scoreTeam(assigned_team):
     sum_test_scores_per_event = np.zeros(num_events)
@@ -333,8 +333,11 @@ def teamToHumanReadableTeam(clean_assigned_team):
 def humanPrintAssignedTeam(assigned_team):
     if isinstance(assigned_team, list):
         human_readable_team = teamToHumanReadableTeam(assigned_team)
-    for person in human_readable_team:
-        print(str(person) + ': ' + str(human_readable_team[person]))
+    for person in people_names:
+        try:
+            print(str(person) + ': ' + str(human_readable_team[person]))
+        except KeyError:
+            pass
     if isinstance(assigned_team, list):
         print(scoreTeam(assigned_team))
     
