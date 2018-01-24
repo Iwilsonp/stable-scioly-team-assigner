@@ -18,11 +18,15 @@ import pickle
 do_compression = 1
 if do_compression != 0 and do_compression != 1:
     raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
-go_random = int(sys.argv[1])
-if go_random != 0 and go_random != 1:
-    raise ValueError('go_random must be 0 or 1, not ' + str(go_random))
-
-list_of_files = sys.argv[2:]
+try:
+    go_random = int(sys.argv[1])
+    if go_random != 0 and go_random != 1:
+        raise ValueError('go_random must be 0 or 1, not ' + str(go_random))
+    
+    list_of_files = sys.argv[2:]
+except IndexError:
+    go_random = 1
+    list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
@@ -195,7 +199,9 @@ def teamToBlockedNames(numerical_team):
     blocked_team_list = []
     for member in numerical_team:
         for block in range(0, num_blocks):
-            blocked_team_list.append(personNameToBlockedNum(member, block))
+            blocked_person_num = personNameToBlockedNum(member, block)
+            if blocked_person_num in person_block_matching:
+                blocked_team_list.append(blocked_person_num)
     return blocked_team_list
 
 def unpackBlockedPersonNum(number):
@@ -236,7 +242,9 @@ def eventListToSinglePersonEvents(list_of_events):
     for event_iterator in range (0, len(list_of_events)):
         event = list_of_events[event_iterator]
         for person_slot in range(0, people_per_event[event_iterator]):
-            blocked_event_list.append(eventToSinglePersonEvent(event, person_slot))
+           blocked_person_number = eventToSinglePersonEvent(event, person_slot)
+           if blocked_person_number in person_block_matching: #we didn't get rid of this row from the score array
+               blocked_event_list.append(blocked_person_number)
     return blocked_event_list
 
 def singlePersonEventToEvent(single_person_event):
@@ -251,21 +259,27 @@ def splitScoreArray(unblocked_scores):
     num_ppl, num_events = unblocked_scores.shape
     num_single_person_events = sum(people_per_event)
     num_blocked_people = num_ppl*num_blocks
-    blocked_array = np.full((num_blocked_people,num_single_person_events), -1.0)
-    
+    blocked_array = np.full((num_blocked_people,num_single_person_events), 0.0)
+    person_per_row_in_score_array = np.zeros(num_blocked_people)
     block_number = 0  #records which block we're on
     for block in event_conflicts:
         for event in block:
             event_num = eventNameToNum(event) #what column number is this event          
             person_number = 0  #records which person we're on
             for score in getCol(unblocked_scores, event_num):
+                person_per_row_in_score_array[personNameToBlockedNum(person_number, block_number)] = personNameToBlockedNum(person_number, block_number)
                 mono_person_event_base_column = eventToSinglePersonEvent(event, 0)
-                blocked_array[person_number*num_blocks + block_number, 
+                blocked_array[personNameToBlockedNum(person_number, block_number), 
                               mono_person_event_base_column:mono_person_event_base_column+people_per_event[event_num]] = score
                 person_number+= 1
         block_number += 1
     
-    return blocked_array
+    #filter score array. from stackoverflow.
+    blocks_with_nothing_in_them = np.where(~blocked_array.any(axis=1))[0]
+
+    blocked_people_with_nonzero_scores = [x for i,x in enumerate(person_per_row_in_score_array) if i not in blocks_with_nothing_in_them]
+    return blocked_array, blocked_people_with_nonzero_scores
+
 
 def getTestScore(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
@@ -314,13 +328,7 @@ def assignTeam(team_list):
     num_real_ppl, num_real_events = scores_blocked_of_team.shape
     #expand to square array
     hungarian_matrix = np.negative(makeSquare(scores_blocked_of_team))
-    
-    start_of_hungarian = time.time()
     assigned_blocked_ppl, blocked_event_assignments = linear_sum_assignment(hungarian_matrix)
-    
-    global time_hungarian_took
-    time_hungarian_took += time.time() - start_of_hungarian
-    
     assigned_team_list = cleanAssignedTeamList(assigned_blocked_ppl, blocked_event_assignments, blocked_team_list, num_real_events)
     return assigned_team_list
 
@@ -502,13 +510,6 @@ event_names = tuple(event_names_list[0])
 people_per_event = tuple(people_per_event_list[0])
 event_weight = tuple(event_weight_list[0])
 
-#begin processing
-num_people = len(people_names)
-max_person_num = num_people - 1
-num_events = len(event_names)
-num_blocks = len(event_conflicts)
-max_people_per_event = max(people_per_event)
-
 #generate combo array of all data
 scores = np.zeros(np.shape(processed_scores_list[0]))
 for x in range(0, len(processed_scores_list)):
@@ -517,14 +518,21 @@ for x in range(0, len(processed_scores_list)):
 for x in range(0, len(event_weight)):
     weight = event_weight[x]
     scores[:,x] = scores[:,x]*weight
-    
+
 #optimize code by compressing the event schedule
 if do_compression == 1:
     compressSchedule()
+    
+#begin processing
+num_people = len(people_names)
+max_person_num = num_people - 1
+num_events = len(event_names)
+num_blocks = len(event_conflicts)
+max_people_per_event = max(people_per_event)
 
 
 #split people into blocks for Hungarian algorithim processing
-scores_blocked = splitScoreArray(scores)
+scores_blocked, person_block_matching = splitScoreArray(scores)
 
 #prior file data will be loaded when we dump the data
 list_of_best_teams = []
@@ -534,7 +542,6 @@ if go_random == 0:
     try:
       print('Choosing from list of top contributors')
       start_time = time.time()
-      time_hungarian_took = 0
       team = []
       list_of_candidates = findBestAdditionList(team)
       team = list_of_candidates[0:team_size]
@@ -542,9 +549,7 @@ if go_random == 0:
       
       assigned_team = assignTeam(team)
       humanPrintAssignedTeam(assigned_team)
-      time_taken = time.time() - start_time
       print('Assignment took ' + str(time.time() - start_time) + 's')
-      print('fraction in Hungarian algorithm: ' + str(time_hungarian_took/time_taken))
       
       addTeamToListOfTeams(assigned_team)
     except KeyboardInterrupt:
