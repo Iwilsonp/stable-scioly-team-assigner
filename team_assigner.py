@@ -314,7 +314,13 @@ def assignTeam(team_list):
     num_real_ppl, num_real_events = scores_blocked_of_team.shape
     #expand to square array
     hungarian_matrix = np.negative(makeSquare(scores_blocked_of_team))
+    
+    start_of_hungarian = time.time()
     assigned_blocked_ppl, blocked_event_assignments = linear_sum_assignment(hungarian_matrix)
+    
+    global time_hungarian_took
+    time_hungarian_took += time.time() - start_of_hungarian
+    
     assigned_team_list = cleanAssignedTeamList(assigned_blocked_ppl, blocked_event_assignments, blocked_team_list, num_real_events)
     return assigned_team_list
 
@@ -528,6 +534,7 @@ if go_random == 0:
     try:
       print('Choosing from list of top contributors')
       start_time = time.time()
+      time_hungarian_took = 0
       team = []
       list_of_candidates = findBestAdditionList(team)
       team = list_of_candidates[0:team_size]
@@ -535,7 +542,9 @@ if go_random == 0:
       
       assigned_team = assignTeam(team)
       humanPrintAssignedTeam(assigned_team)
+      time_taken = time.time() - start_time
       print('Assignment took ' + str(time.time() - start_time) + 's')
+      print('fraction in Hungarian algorithm: ' + str(time_hungarian_took/time_taken))
       
       addTeamToListOfTeams(assigned_team)
     except KeyboardInterrupt:
