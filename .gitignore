@@ -1,6 +1,11 @@
 candidate_names.py
 *.csv
 
+#pickled names of everybody
+outfile
+
+#output
+team_config.txt
 
 
 # Byte-compiled / optimized / DLL files
