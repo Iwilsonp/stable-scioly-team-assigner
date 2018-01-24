@@ -13,7 +13,7 @@ import csv
 import copy
 import time
 
-list_of_files = ['prelim_results.csv']
+list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
@@ -108,9 +108,11 @@ def checkForConflict():
     return False
 #combines blocks where there is no chance of conflict (e.g. Heli and Hover)
 def compressSchedule():
+    print('Number of blocks before compression: ' + str(len(event_conflicts)))
     possible_compression = True       
     while possible_compression == True:
         possible_compression = checkForConflict()
+    print('Number of blocks after compression: ' + str(len(event_conflicts)))
         
             
     
