@@ -13,10 +13,14 @@ import csv
 import copy
 import time
 import sys
+import pickle
 
-do_compression = int(sys.argv[1])
+do_compression = 1
 if do_compression != 0 and do_compression != 1:
     raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
+go_random = int(sys.argv[1])
+if go_random != 0 and go_random != 1:
+    raise ValueError('go_random must be 0 or 1, not ' + str(go_random))
 
 list_of_files = sys.argv[2:]
 
@@ -386,7 +390,7 @@ def teamToHumanReadableTeam(clean_assigned_team):
         person_name = personNumToName(person)
         events = eventNumListToNameList(clean_assigned_team[person])
         if len(events) > 0:  #has some events assigned
-            team_dict[person_name] = events
+            team_dict[person_name] = sorted(events)
     return team_dict
 
 def humanPrintAssignedTeam(assigned_team):
@@ -399,11 +403,43 @@ def humanPrintAssignedTeam(assigned_team):
             pass
     if isinstance(assigned_team, list):
         print('Score: ' + str(scoreTeam(assigned_team)))
+    print('')
     
 
 def humanPrintTeamList(team_list):
     for person in team_list:
         print(personNumToName(person))
+
+def addTeamToListOfTeams(assigned_team):
+    global list_of_best_teams
+    score = scoreTeam(assigned_team)
+    for team_and_score in list_of_best_teams:
+        if team_and_score[0] == score:  #this team already exists
+            return  #break out
+    list_of_best_teams.append([score, assigned_team])
+    
+    list_of_best_teams = sorted(list_of_best_teams)
+
+def printTeams():
+    print('')
+    for team in list_of_best_teams:
+        people = team[1]
+        humanPrintAssignedTeam(people)
+
+def dumpTeams():
+    current_team_list = loadTeams()
+    for team in current_team_list:
+        addTeamToListOfTeams(team[1])
+    printTeams()
+    with open('outfile', 'wb') as fp:
+        pickle.dump(list_of_best_teams, fp)
+
+def loadTeams():
+    try:
+        with open ('outfile', 'rb') as fp:
+            return pickle.load(fp)
+    except FileNotFoundError:
+        return []
         
 def loadFile(file_name):       
     #read in data
@@ -484,30 +520,42 @@ if do_compression == 1:
 #split people into blocks for Hungarian algorithim processing
 scores_blocked = splitScoreArray(scores)
 
-#generate team by just adding whoever increases the score most
-try:
-    start_time = time.time()
-    team = []
-    list_of_candidates = findBestAdditionList(team)
-    team = list_of_candidates[0:team_size]
-    team = optimizeTeam(team)
-    
-    assigned_team = assignTeam(team)
-    humanPrintAssignedTeam(assigned_team)
-    score = scoreTeam(assigned_team)
-    print('Assignment took ' + str(time.time() - start_time) + 's')
-    
-    print('Verifying solution stability')
-    start_time = time.time()
-    randTeam = genRandomTeam(team_size)
+#prior file data will be loaded when we dump the data
+list_of_best_teams = []
 
-    team_2 = optimizeTeam(randTeam)
-    assigned_team_2 = assignTeam(team_2)
-    if scoreTeam(assigned_team_2) == score:  #same team as before
-        print('Stable')
-        print('Verifying stability took ' + str(time.time() - start_time) + 's')
-    else:
-        print('WARNING: Solution unstable! Report immediantly. Include code, score files, and program output.')
-        humanPrintAssignedTeam(assigned_team_2)
+if go_random == 0:
+#generate team by just adding whoever increases the score most
+    try:
+      print('Choosing from list of top contributors')
+      start_time = time.time()
+      team = []
+      list_of_candidates = findBestAdditionList(team)
+      team = list_of_candidates[0:team_size]
+      team = optimizeTeam(team)
+      
+      assigned_team = assignTeam(team)
+      humanPrintAssignedTeam(assigned_team)
+      print('Assignment took ' + str(time.time() - start_time) + 's')
+      
+      addTeamToListOfTeams(assigned_team)
+    except KeyboardInterrupt:
+      sorted_list = sorted(list_of_best_teams)
+      
+      dumpTeams()
+num_tried = 0
+try:
+    while True:
+        start_time = time.time()
+        randTeam = genRandomTeam(team_size)
+
+        real_team = optimizeTeam(randTeam)
+        assigned_team = assignTeam(real_team)
+        humanPrintAssignedTeam(assigned_team)
+        addTeamToListOfTeams(assigned_team)
+        num_tried += 1
+        print('Assignment took ' + str(time.time() - start_time) + 's')
+        print('Number of random teams tried:' + str(num_tried))
 except KeyboardInterrupt:
-    pass
+    sorted_list = sorted(list_of_best_teams)
+    
+    dumpTeams()
