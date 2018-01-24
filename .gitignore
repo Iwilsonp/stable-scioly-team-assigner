@@ -2,7 +2,7 @@ candidate_names.py
 *.csv
 
 #pickled names of everybody
-output
+outfile
 
 #output
 team_config.txt
