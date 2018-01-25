@@ -389,6 +389,8 @@ def stepTeam(team_list):
             print('Added person: ' + personNumToName(int(added_person)))
             new_team.append(added_person)
             new_team.sort()
+            print('Current team:')
+            print(new_team)
             print('New score: ' + str(getTeamScore(new_team)))
             return new_team, True
         del new_team
