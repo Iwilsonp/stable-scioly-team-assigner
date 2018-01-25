@@ -43,6 +43,8 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
 team_size = 15
+dummy_person_name = 'FAKE PERSON'
+dummy_person_number = -1
 
 def predictPlace(test_score):
     return 60*(1-math.sqrt(test_score))   
@@ -65,19 +67,10 @@ def checkInputData(scores, max_scores, people_per_event, event_names, people_nam
         raise ValueError('number of people mismatch between name list and score array')
 
 def checkListEquality(list1, list2):
-    if recursive_len(list1) != recursive_len(list2):
-        return False
-    if type(list1) == type(list2) and type(list1) == list:
-        x = 0
-        for x in range(0, len(list1)):
-            if checkListEquality(list1) != checkListEquality(list2):
-                return False
-        return True  #if passedthe test
+    if list1 == list2:
+        return True
     else:
-        if list1 == list2:
-            return True
-        else:
-            return False
+        return False
        
 def checkAllAreEqual(list_of_data):
     if len(list_of_data) == 1:
@@ -161,6 +154,7 @@ def normalizeData(scores, max_scores):
                     normalized_array[person, event] = 0 #didn't participate
                 else:
                     #ability goes from participation (weakest person) to 1 (perfect 0 score)
+                    #this array call cannot be replaced by getTestScore
                     normalized_array[person, event] = 1 - scores[person, event]/max_score
         else:  #normal event
             normalized_array[:,event] = getCol(scores, event)/max_scores[event]
@@ -180,7 +174,10 @@ def strListToNumList(str_list, num_type = int):
         
       
 def personNumToName(person_number):
-    return people_names[person_number]
+    if person_number < 0 or person_number >=num_people:
+        return dummy_person_name
+    else:
+        return people_names[person_number]
 
 def personNameToNum(person_name):
     return people_names.index(person_name)
@@ -282,8 +279,16 @@ def splitScoreArray(unblocked_scores):
     return blocked_array, blocked_people_with_nonzero_scores
 
 
-def getTestScore(blocked_person, blocked_event):
+def getTestScoreBlocked(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
+
+def getTestScore(person, event):
+    if person < 0: #a fake person
+        return 0
+    try:
+        return scores[person, event]
+    except IndexError:  #a fake person
+        return 0
         
 def scoreTeam(assigned_team):
     sum_test_scores_per_event = np.zeros(num_events)
@@ -292,7 +297,7 @@ def scoreTeam(assigned_team):
         persons_events = assigned_team[person]
         events_per_person_penalty += multiEventPenalty(len(persons_events))
         for event in persons_events:
-            sum_test_scores_per_event[event] += scores[person, event]
+            sum_test_scores_per_event[event] += getTestScore(person, event)
     placing = 0
     for x in range(0, len(sum_test_scores_per_event)):
         score = sum_test_scores_per_event[x]/people_per_event[x]
@@ -334,7 +339,7 @@ def assignTeam(team_list):
     return assigned_team_list
 
 def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num_real_events):
-    team_assigned = [[] for j in range(len(people_names))]
+    team_assigned = [[] for j in range(len(people_names) + 1)]
     num_real_ppl = len(list_blocked_ppl)
     
     for x in range(0, len(assigned_people)):
@@ -344,7 +349,10 @@ def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num
             blocked_person = list_blocked_ppl[x]
             person, block = unpackBlockedPersonNum(blocked_person)
             event = singlePersonEventToEvent(blocked_event)
-            team_assigned[person].append(event)
+            if getTestScoreBlocked(blocked_person, blocked_event) > 0:
+                team_assigned[person].append(event)
+            else:
+                team_assigned[dummy_person_number].append(event)
     return team_assigned
 
 def getTeamScore(unassigned_team_list):
@@ -415,7 +423,10 @@ def teamToHumanReadableTeam(clean_assigned_team):
 def humanPrintAssignedTeam(assigned_team):
     if isinstance(assigned_team, list):
         human_readable_team = teamToHumanReadableTeam(assigned_team)
-    for person in people_names:
+    #need a mutable copy so we can add in the fake person
+    names_to_try = list(people_names)
+    names_to_try.append(dummy_person_name)
+    for person in names_to_try:
         try:
             print(str(person) + ': ' + str(human_readable_team[person]))
         except KeyError:
@@ -538,6 +549,13 @@ max_people_per_event = max(people_per_event)
 
 #split people into blocks for Hungarian algorithim processing
 scores_blocked, person_block_matching = splitScoreArray(scores)
+
+#debugging
+#prob_team = [0, 3, 4, 9, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24, 27]
+
+
+
+#ret_team = optimizeTeam(prob_team)
 
 #prior file data will be loaded when we dump the data
 list_of_best_teams = []
