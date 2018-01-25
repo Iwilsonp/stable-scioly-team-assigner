@@ -15,6 +15,8 @@ import time
 import sys
 import pickle
 
+file_to_save_to = 'team_config.txt'
+
 do_compression = 1
 if do_compression != 0 and do_compression != 1:
     raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
@@ -420,7 +422,7 @@ def teamToHumanReadableTeam(clean_assigned_team):
             team_dict[person_name] = sorted(events)
     return team_dict
 
-def humanPrintAssignedTeam(assigned_team):
+def humanPrintAssignedTeam(assigned_team, to_file = sys.stdout):
     if isinstance(assigned_team, list):
         human_readable_team = teamToHumanReadableTeam(assigned_team)
     #need a mutable copy so we can add in the fake person
@@ -428,12 +430,12 @@ def humanPrintAssignedTeam(assigned_team):
     names_to_try.append(dummy_person_name)
     for person in names_to_try:
         try:
-            print(str(person) + ': ' + str(human_readable_team[person]))
+            print(str(person) + ': ' + str(human_readable_team[person]), file = to_file)
         except KeyError:
             pass
     if isinstance(assigned_team, list):
-        print('Score: ' + str(scoreTeam(assigned_team)))
-    print('')
+        print('Score: ' + str(scoreTeam(assigned_team)), file = to_file)
+    print('', file = to_file)
     
 
 def humanPrintTeamList(team_list):
@@ -450,17 +452,19 @@ def addTeamToListOfTeams(assigned_team):
     
     list_of_best_teams = sorted(list_of_best_teams)
 
-def printTeams():
+def printTeams(to_file):
     print('')
-    for team in list_of_best_teams:
-        people = team[1]
-        humanPrintAssignedTeam(people)
+    open(to_file, 'w').close()  #wipes file of previous teams. From stackoverflow
+    with open(to_file, "a") as save_file:
+        for team in list_of_best_teams:
+            people = team[1]
+            humanPrintAssignedTeam(people, to_file = save_file)
 
 def dumpTeams():
     current_team_list = loadTeams()
     for team in current_team_list:
         addTeamToListOfTeams(team[1])
-    printTeams()
+    printTeams(file_to_save_to)
     with open('outfile', 'wb') as fp:
         pickle.dump(list_of_best_teams, fp)
 
@@ -551,6 +555,7 @@ max_people_per_event = max(people_per_event)
 scores_blocked, person_block_matching = splitScoreArray(scores)
 
 #debugging
+#this team caused an infinite loop
 #prob_team = [0, 3, 4, 9, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24, 27]
 
 
