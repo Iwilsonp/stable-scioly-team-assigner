@@ -25,6 +25,7 @@ try:
     
     list_of_files = sys.argv[2:]
 except IndexError:
+    print('No command line arguments provided, using default values')
     go_random = 1
     list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 
@@ -354,6 +355,7 @@ def findListOfPersonContributions(team_list):
     for person in team_list:
         team_list_with_person_removed = copy.deepcopy(team_list)
         team_list_with_person_removed.remove(person)
+        team_list_with_person_removed.sort()
         people_vs_score_list.append([person, getTeamScore(team_list_with_person_removed)])
         del team_list_with_person_removed
     people_vs_score_list.sort(key=lambda x: x[1]) #sorts by score
@@ -387,6 +389,7 @@ def stepTeam(team_list):
             print('Added person: ' + personNumToName(int(added_person)))
             new_team.append(added_person)
             new_team.sort()
+            print('New score: ' + str(getTeamScore(new_team)))
             return new_team, True
         del new_team
     #if can't optimize further
