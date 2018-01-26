@@ -323,7 +323,7 @@ def makeSquare(numpy_array):
         square_array = numpy_array
     return square_array
 
-#takes in a list of unassigned team names and creates a graph of them
+#takes in a list of unassigned team names and assigns them
 def assignTeam(team_list):
     blocked_team_list = teamToBlockedNames(team_list)
     
@@ -338,7 +338,8 @@ def assignTeam(team_list):
     hungarian_matrix = np.negative(makeSquare(scores_blocked_of_team))
     assigned_blocked_ppl, blocked_event_assignments = linear_sum_assignment(hungarian_matrix)
     assigned_team_list = cleanAssignedTeamList(assigned_blocked_ppl, blocked_event_assignments, blocked_team_list, num_real_events)
-    return assigned_team_list
+    return assigned_team_list      
+    
 
 def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num_real_events):
     team_assigned = [[] for j in range(len(people_names) + 1)]
@@ -356,6 +357,15 @@ def cleanAssignedTeamList(assigned_people, blocked_events, list_blocked_ppl, num
             else:
                 team_assigned[dummy_person_number].append(event)
     return team_assigned
+
+#turns an assigned team into a numerical list of members
+def unassignTeam(assigned_team):
+    unassigned_team = []
+    #iterate over people's numbers
+    for x in range(0, num_people):
+        if len(assigned_team[x]) != 0: #events assigned to this person
+            unassigned_team.append(x)
+    return unassigned_team
 
 def getTeamScore(unassigned_team_list):
     return scoreTeam(assignTeam(unassigned_team_list))
@@ -452,29 +462,80 @@ def addTeamToListOfTeams(assigned_team):
     
     list_of_best_teams = sorted(list_of_best_teams)
 
+def getScoreAndTeam(team_from_list_of_teams):
+    assigned_team = team_from_list_of_teams[1]
+    score = team_from_list_of_teams[0]
+    return score, assigned_team
+
 def printTeams(to_file):
-    print('')
     open(to_file, 'w').close()  #wipes file of previous teams. From stackoverflow
     with open(to_file, "a") as save_file:
+        print('Number of teams: ' + str(len(list_of_best_teams)), file = save_file)
+        print('', file = save_file)
         for team in list_of_best_teams:
             people = team[1]
             humanPrintAssignedTeam(people, to_file = save_file)
 
-def dumpTeams():
-    current_team_list = loadTeams()
+def dumpTeams(was_interrupted):
+    finished_optimizing, current_team_list = loadTeams()
     for team in current_team_list:
         addTeamToListOfTeams(team[1])
     printTeams(file_to_save_to)
+    
+    list_of_best_teams.insert(0, was_interrupted)
     with open('outfile', 'wb') as fp:
         pickle.dump(list_of_best_teams, fp)
 
 def loadTeams():
     try:
         with open ('outfile', 'rb') as fp:
-            return pickle.load(fp)
+            data = pickle.load(fp)
+            was_interrupted = data[0]
+            team_list = data[1:]
+            return was_interrupted, team_list
     except FileNotFoundError:
-        return []
+        return False, []
+
+def fuseScoresAcrossInvites(list_of_scores, list_of_weights):
+    fused_score = 0
+    total_weight_from_invites_with_scores = 0
+    total_weight_from_invites_without_scores = 0
+    
+    for x in range(0, len(list_of_scores)):
+        score = list_of_scores[x]
+        weight = list_of_weights[x]
+        if score > 0: #did this event at this invite
+            fused_score += score*weight
+            total_weight_from_invites_with_scores += weight
+        else: #didn't do this event at this invite
+            total_weight_from_invites_without_scores += weight
+    if total_weight_from_invites_with_scores == 0:  #never participated
+        return 0
+    #the sqrt is so that non-participation is a small penalty, but not insurmountable.
+    return fused_score/math.sqrt(total_weight_from_invites_with_scores)
+    
+
+def fuseScoreMatrix(scores_from_all_invites, invite_weights, event_weights):
+    num_ppl, num_events = np.shape(scores_from_all_invites[0])
+    scores = np.zeros((num_ppl, num_events))
+    
+    scores_from_all_invites = np.asarray(scores_from_all_invites)
+    for person in range(0, num_ppl):
+        for event in range(0, num_events):
+            scores[person, event] = fuseScoresAcrossInvites(
+                    scores_from_all_invites[:, person, event], invite_weights)
+    
+    #deal with event weights
+    for x in range(0, len(event_weights)):
+        weight = event_weight[x]
+        scores[:,x] = scores[:,x]*weight
         
+    return scores
+
+#ensure invite weights sum to 1
+def normalizeInviteWeights(invite_weight_list):
+    return tuple(np.asarray(invite_weight_list)/sum(invite_weight_list))
+
 def loadFile(file_name):       
     #read in data
     first_column = []
@@ -514,7 +575,7 @@ for file in list_of_files:
     event_weight_list.append(event_weight)
     invite_weight_list.append(data_weight)
 
-#begin checks to see if csv files are consistent
+#begin checks to see if csv file headers are consistent
 if checkAllAreEqual(people_names_list) == False:
     raise ValueError('people names must be consistent')
 if checkAllAreEqual(event_names_list) == False:
@@ -523,6 +584,9 @@ if checkAllAreEqual(people_per_event_list) == False:
     raise ValueError('people per event must be consistent')
 if checkAllAreEqual(event_weight_list) == False:
     raise ValueError('event weights must be consistent')
+    
+#normalize weights
+invite_weight_list = normalizeInviteWeights(invite_weight_list)
 
 #nobody should be modifying these    
 people_names = tuple(people_names_list[0])
@@ -531,13 +595,7 @@ people_per_event = tuple(people_per_event_list[0])
 event_weight = tuple(event_weight_list[0])
 
 #generate combo array of all data
-scores = np.zeros(np.shape(processed_scores_list[0]))
-for x in range(0, len(processed_scores_list)):
-    scores = scores + processed_scores_list[x]*invite_weight_list[x]
-
-for x in range(0, len(event_weight)):
-    weight = event_weight[x]
-    scores[:,x] = scores[:,x]*weight
+scores = fuseScoreMatrix(processed_scores_list, invite_weight_list, event_weight)
 
 #optimize code by compressing the event schedule
 if do_compression == 1:
@@ -563,27 +621,40 @@ scores_blocked, person_block_matching = splitScoreArray(scores)
 #ret_team = optimizeTeam(prob_team)
 
 #prior file data will be loaded when we dump the data
+finished_optimizing_previously, list_of_prior_teams = loadTeams()
 list_of_best_teams = []
-
-if go_random == 0:
-#generate team by just adding whoever increases the score most
-    try:
-      print('Choosing from list of top contributors')
-      start_time = time.time()
-      team = []
-      list_of_candidates = findBestAdditionList(team)
-      team = list_of_candidates[0:team_size]
-      team = optimizeTeam(team)
-      
-      assigned_team = assignTeam(team)
-      humanPrintAssignedTeam(assigned_team)
-      print('Assignment took ' + str(time.time() - start_time) + 's')
-      
-      addTeamToListOfTeams(assigned_team)
-    except KeyboardInterrupt:
-      sorted_list = sorted(list_of_best_teams)
-      
-      dumpTeams()
+try:
+    print('Checking saved teams to see if any can be further optimized')
+    for x in range(0, len(list_of_prior_teams)):
+        assigned_team_and_score = list_of_prior_teams[x]
+        score, assigned_team = getScoreAndTeam(assigned_team_and_score)
+        if score != scoreTeam(assigned_team) or finished_optimizing_previously == False:
+            print('Found a team that could be potentially optimized')
+            start_time = time.time()
+            team_list = unassignTeam(assigned_team)
+            optimized_team = optimizeTeam(team_list)
+            
+            new_assigned_team = assignTeam(optimized_team)
+            humanPrintAssignedTeam(new_assigned_team)
+            print('Optimization took ' + str(time.time() - start_time) + 's')
+            print('If nobody was booted, the team list remained the same, but people may have been rearranged')
+  
+        addTeamToListOfTeams(assigned_team)
+except KeyboardInterrupt:
+    print('WARNING: Interrupted in the middle of optimizing prior teams! Strange behavior may result.')
+    for y in range(x, len(list_of_prior_teams)):
+        assigned_team_and_score = list_of_prior_teams[y]
+        score, assigned_team = getScoreAndTeam(assigned_team_and_score)
+        
+        #the unassignment and reassignment is so the team is assigned optimally with the new input data
+        addTeamToListOfTeams(assignTeam(unassignTeam(assigned_team)))
+    sorted_list = sorted(list_of_best_teams)
+    dumpTeams(False)
+    
+    print('The SystemExit exception is normal. It exits the program so we do not go on to random teams.')
+    sys.exit()  #so we don't go on to random teams
+    
+print('Finished checking old teams for optimizations. Starting guessing random teams.')
 num_tried = 0
 try:
     while True:
@@ -600,4 +671,4 @@ try:
 except KeyboardInterrupt:
     sorted_list = sorted(list_of_best_teams)
     
-    dumpTeams()
+    dumpTeams(True)
