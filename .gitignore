@@ -7,6 +7,9 @@ outfile
 #output
 team_config.txt
 
+#locked files
+.~lock.*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
