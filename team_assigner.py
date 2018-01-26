@@ -21,14 +21,10 @@ do_compression = 1
 if do_compression != 0 and do_compression != 1:
     raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
 try:
-    go_random = int(sys.argv[1])
-    if go_random != 0 and go_random != 1:
-        raise ValueError('go_random must be 0 or 1, not ' + str(go_random))
     
-    list_of_files = sys.argv[2:]
+    list_of_files = sys.argv[1:]
 except IndexError:
     print('No command line arguments provided, using default values')
-    go_random = 1
     list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 
 #built assuming we are team C-38. All self-schedule events given their own block
