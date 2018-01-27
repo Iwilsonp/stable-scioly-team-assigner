@@ -29,7 +29,7 @@ try:
 except IndexError:
     print('No command line arguments provided, using default values')
     go_random = 1
-    list_of_files = ['prelim_results.csv', 'mit_scores.csv']
+    list_of_files = ['prelim_results.csv','mit_scores.csv']
 
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
@@ -45,8 +45,11 @@ event_conflicts = [['Disease Detectives','Fermi Questions'],
                    ['Mousetrap Vehicle'],
                    ['Towers']]
 team_size = 15
+max_num_seniors = 7
+
 dummy_person_name = 'FAKE PERSON'
 dummy_person_number = -1
+invalid_team_score = 1000000
 
 def predictPlace(test_score):
     return 60*(1-math.sqrt(test_score))   
@@ -54,7 +57,17 @@ def predictPlace(test_score):
 def multiEventPenalty(events_one_person):
     return 0
 
-def checkInputData(scores, max_scores, people_per_event, event_names, people_names):
+def isBool(test_bool):
+    return (test_bool == 0 or test_bool == 1)
+
+def isNumber(number):
+    try:
+        float(number)
+        return True
+    except ValueError:
+        return False
+
+def checkInputData(scores, max_scores, people_per_event, event_names, people_names, is_senior):
     num_ppl, num_events = scores.shape
     if(len(people_per_event) != num_events):
         raise ValueError('number of events mismatch between people per event list and score array')
@@ -67,6 +80,11 @@ def checkInputData(scores, max_scores, people_per_event, event_names, people_nam
     
     if(len(people_names) != num_ppl):
         raise ValueError('number of people mismatch between name list and score array')
+    if(len(is_senior)!=num_ppl):
+        raise ValueError('number of people is not the same as the length of the senior bool list')
+    for senior_status in is_senior:
+        if isBool(senior_status) == False:
+            raise ValueError('numbers in senior status column must be 0 or 1, not ' + str(senior_status))
 
 def checkListEquality(list1, list2):
     if list1 == list2:
@@ -280,6 +298,30 @@ def splitScoreArray(unblocked_scores):
     blocked_people_with_nonzero_scores = [x for i,x in enumerate(person_per_row_in_score_array) if i not in blocks_with_nothing_in_them]
     return blocked_array, blocked_people_with_nonzero_scores
 
+def isSenior(person):
+    if isinstance(person, str):
+        person = personNameToNum(person)
+    if who_are_seniors[person] == 1:
+        return True
+    elif who_are_seniors[person] == 0:
+        return False
+    else:
+        raise ValueError('person not a 0 or a 1, is a ' + str(person))     
+
+def getNumSeniors(team_list):
+    if isAssigned(team_list):
+        team_list = unassignTeam(team_list)
+    num_seniors = 0
+    for person in team_list:
+        if isSenior(person):
+            num_seniors += 1
+    return num_seniors
+
+def numSeniorsOK(team_list):
+    if getNumSeniors(team_list) > max_num_seniors:
+        return False
+    else:
+        return True
 
 def getTestScoreBlocked(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
@@ -293,6 +335,11 @@ def getTestScore(person, event):
         return 0
         
 def scoreTeam(assigned_team):
+    #check if the number of seniors is OK
+    if numSeniorsOK(assigned_team) == False:
+        return invalid_team_score
+    #get the test score for each event.
+    #an event is one entry in the vector (its number is its index)
     sum_test_scores_per_event = np.zeros(num_events)
     events_per_person_penalty = 0
     for person in range(0, len(assigned_team)):
@@ -300,6 +347,7 @@ def scoreTeam(assigned_team):
         events_per_person_penalty += multiEventPenalty(len(persons_events))
         for event in persons_events:
             sum_test_scores_per_event[event] += getTestScore(person, event)
+    #convert scores to placings and sum them to get the total team score
     placing = 0
     for x in range(0, len(sum_test_scores_per_event)):
         score = sum_test_scores_per_event[x]/people_per_event[x]
@@ -307,9 +355,17 @@ def scoreTeam(assigned_team):
     return placing + events_per_person_penalty
 
 def genRandomTeam(size):
-    team_list = random.sample(range(0, num_people), size)
-    return team_list
-
+    num_guesses = 0
+    already_warned = False
+    while True:
+        num_guesses += 1
+        team_list = random.sample(range(0, num_people), size)
+        if numSeniorsOK(team_list):
+            return team_list
+        #warn if having trouble guessing team
+        if num_guesses > 10000 and already_warned == False:
+            print('Guessing a team with few enough seniors is taking longer than expected. Are there enough non-seniors?')
+            already_warned == True
 #makes a matrix square
 def makeSquare(numpy_array):
     height, width = numpy_array.shape
@@ -367,7 +423,19 @@ def unassignTeam(assigned_team):
             unassigned_team.append(x)
     return unassigned_team
 
+#tells if team is assigned or not
+def isAssigned(team):
+    if isinstance(team[0], list):
+        return True
+    elif isNumber(team[0]):
+        return False
+    else:
+        raise TypeError('Wrong type of list passed. Member 0: ' + str(team[0]))
+        
+
 def getTeamScore(unassigned_team_list):
+    if numSeniorsOK(unassigned_team_list) == False:
+        return invalid_team_score
     return scoreTeam(assignTeam(unassigned_team_list))
 #takes in an unassigned list and returns it sorted by least contribution to greatest
 def findListOfPersonContributions(team_list):
@@ -536,15 +604,21 @@ def fuseScoreMatrix(scores_from_all_invites, invite_weights, event_weights):
 def normalizeInviteWeights(invite_weight_list):
     return tuple(np.asarray(invite_weight_list)/sum(invite_weight_list))
 
-def loadFile(file_name):       
+def loadFile(file_name):  
+    print('loading file: ' + str(file_name))     
     #read in data
+    #for people names
     first_column = []
+    #for is a senior
+    second_column = []
+    #for everything else
     prelim_data = []
     with open(file_name) as data_file:
         data_reader = csv.reader(data_file)
         for row in data_reader:
             first_column.append(row[0])
-            prelim_data.append(row[1:])
+            second_column.append(row[1])
+            prelim_data.append(row[2:])
     
     people_names = tuple(first_column[4:])
     event_names = tuple(prelim_data[0])
@@ -554,22 +628,26 @@ def loadFile(file_name):
     
     max_data_scores = tuple(strListToNumList(prelim_data[2], num_type = float))
     raw_data_scores = strListToNumList(prelim_data[4:], num_type = float)
+    is_senior = tuple(strListToNumList(second_column[4:], num_type = int))
     np_raw_data_scores = np.asarray(raw_data_scores) #convert to numpy array
-    checkInputData(np_raw_data_scores, max_data_scores, people_per_event, event_names, people_names)
+    
+    checkInputData(np_raw_data_scores, max_data_scores, people_per_event, event_names, people_names, is_senior)
     processed_data_scores = normalizeData(np_raw_data_scores, max_data_scores)
-    return processed_data_scores, people_names, event_names, people_per_event, event_weight, data_weight
+    return processed_data_scores, people_names, is_senior, event_names, people_per_event, event_weight, data_weight
 
 #import data from file
 processed_scores_list = []
 people_names_list = []
+seniors_list = []
 event_names_list = []
 people_per_event_list = []
 event_weight_list = []
 invite_weight_list = []
 for file in list_of_files:
-    processed_data_scores, people_names, event_names, people_per_event, event_weight, data_weight = loadFile(file)
+    processed_data_scores, people_names, are_seniors, event_names, people_per_event, event_weight, data_weight = loadFile(file)
     processed_scores_list.append(processed_data_scores)
     people_names_list.append(people_names)
+    seniors_list.append(are_seniors)
     event_names_list.append(event_names)
     people_per_event_list.append(people_per_event)
     event_weight_list.append(event_weight)
@@ -577,19 +655,22 @@ for file in list_of_files:
 
 #begin checks to see if csv file headers are consistent
 if checkAllAreEqual(people_names_list) == False:
-    raise ValueError('people names must be consistent')
+    raise ValueError('people names must be consistent across files')
+if checkAllAreEqual(seniors_list) == False:
+    raise ValueError('the people who are seniors must be consistent across files')
 if checkAllAreEqual(event_names_list) == False:
-    raise ValueError('event names must be consistent')
+    raise ValueError('event names must be consistent across files')
 if checkAllAreEqual(people_per_event_list) == False:
-    raise ValueError('people per event must be consistent')
+    raise ValueError('people per event must be consistent across files')
 if checkAllAreEqual(event_weight_list) == False:
-    raise ValueError('event weights must be consistent')
+    raise ValueError('event weights must be consistent across files')
     
 #normalize weights
 invite_weight_list = normalizeInviteWeights(invite_weight_list)
 
 #nobody should be modifying these    
 people_names = tuple(people_names_list[0])
+who_are_seniors = tuple(seniors_list[0])
 event_names = tuple(event_names_list[0])
 people_per_event = tuple(people_per_event_list[0])
 event_weight = tuple(event_weight_list[0])
