@@ -15,16 +15,13 @@ import time
 import sys
 import pickle
 
+#sorted list of teams
 file_to_save_to = 'team_config.txt'
+csv_of_people_who_must_be_on = 'forced_on_people.csv'
 
-do_compression = 1
-if do_compression != 0 and do_compression != 1:
-    raise ValueError('do_compression must be 0 or 1, not ' + str(do_compression))
-try:
-    
-    list_of_files = sys.argv[1:]
-except IndexError:
-    print('No command line arguments provided, using default values')
+list_of_files = sys.argv[1:]
+if list_of_files == []:
+    print('No score files provided on the command line, using default values')
     list_of_files = ['prelim_results.csv', 'mit_scores.csv']
 
 #built assuming we are team C-38. All self-schedule events given their own block
@@ -319,6 +316,19 @@ def numSeniorsOK(team_list):
     else:
         return True
 
+def forcedOnPeopleOn(team_list):
+    if isAssigned(team_list):
+        team_list = unassignTeam(team_list)
+    try:
+        for forced_on_person in forced_on_people:
+            team_list.index(forced_on_person)
+    except ValueError:  #person not in team list
+        return False
+    #if everybody on who must be in team
+    return True
+        
+    
+
 def getTestScoreBlocked(blocked_person, blocked_event):
     return scores_blocked[blocked_person, blocked_event]
 
@@ -333,6 +343,8 @@ def getTestScore(person, event):
 def scoreTeam(assigned_team):
     #check if the number of seniors is OK
     if numSeniorsOK(assigned_team) == False:
+        return invalid_team_score
+    if forcedOnPeopleOn(assigned_team) == False:
         return invalid_team_score
     #get the test score for each event.
     #an event is one entry in the vector (its number is its index)
@@ -353,9 +365,14 @@ def scoreTeam(assigned_team):
 def genRandomTeam(size):
     num_guesses = 0
     already_warned = False
+    
+    if size < len(forced_on_people):
+        raise ValueError('the team must be at least as many people as are forced on')
+    num_free_slots = size - len(forced_on_people)
     while True:
         num_guesses += 1
-        team_list = random.sample(range(0, num_people), size)
+        team_list = random.sample(range(0, num_people), num_free_slots)
+        team_list = team_list + forced_on_people
         if numSeniorsOK(team_list):
             return team_list
         #warn if having trouble guessing team
@@ -431,6 +448,8 @@ def isAssigned(team):
 
 def getTeamScore(unassigned_team_list):
     if numSeniorsOK(unassigned_team_list) == False:
+        return invalid_team_score
+    if forcedOnPeopleOn(unassigned_team_list) == False:
         return invalid_team_score
     return scoreTeam(assignTeam(unassigned_team_list))
 #takes in an unassigned list and returns it sorted by least contribution to greatest
@@ -600,6 +619,20 @@ def fuseScoreMatrix(scores_from_all_invites, invite_weights, event_weights):
 def normalizeInviteWeights(invite_weight_list):
     return tuple(np.asarray(invite_weight_list)/sum(invite_weight_list))
 
+def loadAndCheckForcedOnPeople():
+    people_who_must_be_on = []
+    with open(csv_of_people_who_must_be_on) as data_file:
+        data_reader = csv.reader(data_file)
+        for row in data_reader:
+            for person in row:
+                try:
+                    person_num = personNameToNum(person)
+                except ValueError:
+                    raise ValueError('People in the forced on team list must be in the team list')
+                people_who_must_be_on.append(person_num)
+    return people_who_must_be_on
+                    
+
 def loadFile(file_name):  
     print('loading file: ' + str(file_name))     
     #read in data
@@ -667,16 +700,21 @@ invite_weight_list = normalizeInviteWeights(invite_weight_list)
 #nobody should be modifying these    
 people_names = tuple(people_names_list[0])
 who_are_seniors = tuple(seniors_list[0])
+
 event_names = tuple(event_names_list[0])
 people_per_event = tuple(people_per_event_list[0])
 event_weight = tuple(event_weight_list[0])
+
+#people who must be on. Must be after we create the list of people names
+print(personNameToNum('Antonio Frigo'))
+forced_on_people = loadAndCheckForcedOnPeople()
+print(forced_on_people)
 
 #generate combo array of all data
 scores = fuseScoreMatrix(processed_scores_list, invite_weight_list, event_weight)
 
 #optimize code by compressing the event schedule
-if do_compression == 1:
-    compressSchedule()
+compressSchedule()
     
 #begin processing
 num_people = len(people_names)
@@ -691,9 +729,8 @@ scores_blocked, person_block_matching = splitScoreArray(scores)
 
 #debugging
 #this team caused an infinite loop
-#prob_team = [0, 3, 4, 9, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24, 27]
-
-
+prob_team = [0, 3, 4, 9, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24, 27]
+test_team = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 #ret_team = optimizeTeam(prob_team)
 
