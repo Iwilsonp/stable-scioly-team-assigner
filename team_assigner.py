@@ -747,7 +747,7 @@ test_team = [0, 1, 3, 7, 10, 11, 12, 13, 15, 16, 18, 22, 27, 28]
 finished_optimizing_previously, list_of_prior_teams = loadTeams()
 list_of_best_teams = []
 try:
-    print('Checking saved teams to see if any can be further optimized')
+    print('Checking saved teams to see if any can be further optimized. Do not parallelize this step by opening multiple windows.')
     for x in range(0, len(list_of_prior_teams)):
         assigned_team_and_score = list_of_prior_teams[x]
         score, assigned_team = getScoreAndTeam(assigned_team_and_score)
@@ -777,7 +777,7 @@ except KeyboardInterrupt:
     print('The SystemExit exception is normal. It exits the program so we do not go on to random teams.')
     sys.exit()  #so we don't go on to random teams
     
-print('Finished checking old teams for optimizations. Starting guessing random teams.')
+print('Finished checking old teams for optimizations. Starting guessing random teams. Parallelization by running multiple copies of this program is fine (and recommended).')
 num_tried = 0
 try:
     while True:
