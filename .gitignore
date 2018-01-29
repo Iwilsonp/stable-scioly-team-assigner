@@ -4,6 +4,7 @@
 #but these examples should be there
 !example.csv
 !event_conflicts.csv
+!forced_on_people.csv
 
 #pickled names of everybody
 outfile

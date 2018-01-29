@@ -27,8 +27,8 @@ csv_of_people_who_must_be_on = 'forced_on_people.csv'
 
 list_of_files = sys.argv[1:]
 if list_of_files == []:
-    print('No score files provided on the command line, using default values')
-    list_of_files = ['prelim_results.csv', 'mit_scores.csv']
+    print('No score files provided on the command line, using examples')
+    list_of_files = ['example.csv']
 
 #built assuming we are team C-38. All self-schedule events given their own block
 event_conflicts = [['Disease Detectives','Fermi Questions'],
