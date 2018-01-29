@@ -5,9 +5,15 @@ Created on Wed Jan 17 15:03:13 2018
 
 @author: me
 """
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    raise ImportError('You must have Numpy installed')
 import math
-from scipy.optimize import linear_sum_assignment
+try:
+    from scipy.optimize import linear_sum_assignment
+except ImportError:
+    raise ImportError('You must have Scipy installed')
 import random
 import csv
 import copy

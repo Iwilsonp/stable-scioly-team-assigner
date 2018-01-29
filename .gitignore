@@ -1,5 +1,9 @@
-candidate_names.py
+#so I don't put sensitive data in the github repo
 *.csv
+
+#but these examples should be there
+!example.csv
+!event_conflicts.csv
 
 #pickled names of everybody
 outfile
