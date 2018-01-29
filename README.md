@@ -3,10 +3,10 @@ This python script chooses and assigns to events a team of 15 people from a list
 
 ## Getting Started
 Make a new folder to put everything in. Then download everything in the Github repo. To run, open a command line and navigate to the folder. Then run 'python team_assigner.py' followed by the names of the csv files with data in them:
-'''
+```
 python team_assigner.py example_scores.csv
-'''
-[[Pictures/running_the_team_assigner.png|alt=how to run the team assigner]]
+```
+![how to run the team assigner](Pictures/running_the_team_assigner.png)
 Replace example_scores.csv with whatever the names of your score sheets are. There can be multiple csv files included.
 
 ### Needed packages
@@ -17,17 +17,17 @@ Replace example_scores.csv with whatever the names of your score sheets are. The
 ####Checking your Python configuration:
 
 Open a command line. Run:
-'''
+```
 python
-'''
+```
 When the Python shell loads, run:
-'''
+```
 import numpy
 from scipy.optimize import linear_sum_assignment
-'''
+```
 
 If either of these commands causes an error, you don't have that package installed. A successful test does nothing, like this:
-[[Pictures/check_python.png|alt=successful python test]]
+![successful python test](Pictures/check_python.png)
 
 ### Output
 The teams the assigner comes up with are put in a text file, team_config.txt. They are sorted by score. Duplicates are removed.
