@@ -15,9 +15,9 @@ This python script chooses and assigns to events a team of 15 people from a list
 * Takes ~30 seconds per optimization attempt (selecting from 30 people on a 2011 i3 laptop. Scaling law unknown.), but it can be parallelized by running two (or more) copies of the program in parallel.
 
 ### Notable things the team assigner CANNOT do
-*Only as good as the data you give it (see section on data inputs for more)
-*No guarantee of optimally choosing 15 people from the list of candidates. However, after trying 20-30 teams it is unlikely to find a better. Also, after a minor score tweak, See section on the algorithm for more.
-*Cannot select two equal (unstacked) teams.
+* Only as good as the data you give it (see section on data inputs for more)
+* No guarantee of optimally choosing 15 people from the list of candidates. However, after trying 20-30 teams it is unlikely to find a better. Also, after a minor score tweak, See section on the algorithm for more.
+* Cannot select two equal (unstacked) teams.
 
 ## Getting Started
 Make a new folder to put everything in. Then download everything in the Github repo. To run, open a command line and navigate to the folder. Then run 'python team_assigner.py' followed by the names of the csv files with data in them:
@@ -32,7 +32,7 @@ Replace example_scores.csv with whatever the names of your score sheets are. The
 * Numpy. A fast computation package for Python not included in the standard distribution (but very widely used).
 * Scipy library. This supplies the Hungarian algorithm used to assign people to events.
 
-####Checking your Python configuration:
+#### Checking your Python configuration:
 
 Open a command line. Run:
 ```
