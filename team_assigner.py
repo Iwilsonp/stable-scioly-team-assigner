@@ -31,22 +31,6 @@ if list_of_files == []:
     print('No score files provided on the command line, using examples')
     list_of_files = ['example_scores.csv']
 
-#built assuming we are team C-38. All self-schedule events given their own block
-
-'''
-event_conflicts = [['Disease Detectives','Fermi Questions'],
-                   ['Anatomy and Physiology','Dynamic Planet','Rocks and Minerals'],
-                   ['Chemistry Lab','Ecology','Remote Sensing'],
-                   ['Herpetology','Optics'],
-                   ['Astronomy','Game On','Microbe Mission'],
-                   ['Experimental Design','Forensics'],
-                   ['Materials Science','Thermodynamics', 'Write It Do It'],
-                   ['Helicopters'],
-                   ['Hovercraft'],
-                   ['Mission Possible'],
-                   ['Mousetrap Vehicle'],
-                   ['Towers']]
-'''
 team_size = 15
 max_num_seniors = 7
 
@@ -177,9 +161,12 @@ def strListToNumList(str_list, num_type = int):
         
       
 def personNumToName(person_number):
-    if person_number < 0 or person_number >=num_people:
-        return dummy_person_name
-    else:
+    try:
+        if person_number < 0 or person_number >=num_people:
+            return dummy_person_name
+        else:
+            return people_names[person_number]
+    except NameError:   #num_people not defined
         return people_names[person_number]
 
 def personNameToNum(person_name):

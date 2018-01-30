@@ -20,12 +20,7 @@ This python script chooses and assigns to events a team of 15 people from a list
 * Cannot select two equal (unstacked) teams.
 
 ## Getting Started
-Make a new folder to put everything in. Then download everything in the Github repo. To run, open a command line and navigate to the folder. Then run 'python team_assigner.py' followed by the names of the csv files with data in them:
-```
-python team_assigner.py example_scores.csv
-```
-![how to run the team assigner](Pictures/running_the_team_assigner.png)
-Replace example_scores.csv with whatever the names of your score sheets are. There can be multiple csv files included.
+Make a new folder to put everything in. Then download everything in the Github repo.
 
 ### Needed packages
 * Python (The latest 3.x is the supported version, but it will probably run with Python 2.7).
@@ -46,6 +41,21 @@ from scipy.optimize import linear_sum_assignment
 
 If either of these commands causes an error, you don't have that package installed. A successful test does nothing, like this:
 ![successful python test](Pictures/check_python.png)
+
+## Running the team assigner
+To run, open a command line and navigate to the folder. Then run 'python team_assigner.py' followed by the names of the csv files with data in them:
+```
+python team_assigner.py example_scores.csv
+```
+![how to run the team assigner](Pictures/running_the_team_assigner.png)
+Replace example_scores.csv with whatever the names of your score sheets are. There can be multiple csv files included.
+
+### Input
+The team assigner uses 3 or more files (all but one are .csv files): event_conflicts.csv, forced_on_people.csv, outfile, and any score .csv files. For more information, see the Input Data section.
+* event_conflicts.csv is directly accessed by the team assigner. It contains the schedule. It must be in the same folder as team_assigner.py.
+* forced_on_people.csv is directly accessed by the team assigner. It contains any people who must be on the team. It must be in the same folder as team_assigner.py.
+* outfile is a file made by the program. It records the program's prior trials. It must be in the same folder as team_assigner.py to be used.
+* any score .csv files do NOT have to be in the same folder as team_assigner.py, but the path must be given to the program as a command line argument.
 
 ### Output
 The teams the assigner comes up with are put in a text file, team_config.txt. They are sorted by score. Duplicates are removed.
