@@ -1,18 +1,18 @@
 # scioly-team-assigner
-This python script chooses and assigns to events a team of 15 people from a list of candidates. It optimizes the sum of their test scores.
+This python script chooses and assigns to events a team of 15 people from a list of candidates. It optimizes the sum of their test scores. This repo is for the stable, documented release: for the unstable testing repo, see https://github.com/Iwilsonp/scioly-team-assigner
 
 ## Features
-*Guaranteed that each assignment of 15 people to events maximizes the sum of their test scores. (Test scores are normalized to 0-1).
-*Respects the event schedule. (Only 1, though. Can't optimize for both States and Nationals if the schedules are different).
-*Respects 7 senior limit.
-*Supports 3 person events.
-*Supports low-score-wins events (gives the worst person a participation score of 10%, and somebody with a score of 0 100%)
-*Supports custom weighting for events (if you think that Write It Do It scores should not be weighted as heavily as Astronomy in its optimizing process, you can do it).
-*Supports inputting data from multiple invitationals and weighting that data differently. (If you think somebody's score on the MIT invite test should matter more than the preliminary testing your team had, it can be done.)
-*Supports forcing certain people (like the officers) to be present on the team.
-*Generates multiple teams and orders them by score.
-*Supports giving events to people who have not competed in them.
-*Takes ~30 seconds per optimization attempt (selecting from 30 people on a 2011 i3 laptop. Scaling law unknown.), but it can be parallelized by running two (or more) copies of the program in parallel.
+* Guaranteed that each assignment of 15 people to events maximizes the sum of their test scores. (Test scores are normalized to 0-1).
+* Respects the event schedule. (Only 1, though. Can't optimize for both States and Nationals if the schedules are different).
+* Respects 7 senior limit.
+* Supports 3 person events.
+* Supports low-score-wins events (gives the worst person a participation score of 10%, and somebody with a score of 0 100%)
+* Supports custom weighting for events (if you think that Write It Do It scores should not be weighted as heavily as Astronomy in its optimizing process, you can do it).
+* Supports inputting data from multiple invitationals and weighting that data differently. (If you think somebody's score on the MIT invite test should matter more than the preliminary testing your team had, it can be done.)
+* Supports forcing certain people (like the officers) to be present on the team.
+* Generates multiple teams and orders them by score.
+* Supports giving events to people who have not competed in them.
+* Takes ~30 seconds per optimization attempt (selecting from 30 people on a 2011 i3 laptop. Scaling law unknown.), but it can be parallelized by running two (or more) copies of the program in parallel.
 
 ### Notable things the team assigner CANNOT do
 *Only as good as the data you give it (see section on data inputs for more)
